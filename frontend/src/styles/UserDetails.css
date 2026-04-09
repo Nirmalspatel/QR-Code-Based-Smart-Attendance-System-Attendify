@@ -1,0 +1,112 @@
+.user-details {
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+
+.user-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: var(--primary-color);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: var(--shadow-sm);
+  border: 2px solid var(--white);
+  overflow: hidden;
+  transition: var(--transition-fast);
+}
+
+.user-icon:hover {
+  transform: scale(1.05);
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary-color);
+}
+
+.user-details-container {
+  position: absolute;
+  top: 55px;
+  right: -10px;
+  width: 240px;
+  background-color: var(--white);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  padding: 15px 0;
+  z-index: 1000;
+  animation: slideInDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.user-info-section {
+  padding: 0 20px 10px 20px;
+}
+
+.user-name {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.user-email {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 2px 0 0 0;
+}
+
+.user-details-popup hr {
+  border: 0;
+  border-top: 1px solid #f1f3f5;
+  margin: 10px 0;
+}
+
+.user-actions {
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-item-btn {
+  width: 100%;
+  padding: 12px 20px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.menu-item-btn span {
+  font-size: 1.1rem;
+}
+
+.menu-item-btn:hover {
+  background-color: var(--bg-color);
+  color: var(--primary-color);
+}
+
+.logout-item {
+  color: var(--error-color);
+}
+
+.logout-item:hover {
+  background-color: #fff1f2;
+  color: var(--error-color);
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

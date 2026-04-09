@@ -1,0 +1,24 @@
+.logout-main {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--bg-color);
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+}
+
+.logout-main h1 {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--primary-color);
+  margin-bottom: 15px;
+  letter-spacing: -1px;
+}
+
+.logout-main p {
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  font-weight: 500;
+}
