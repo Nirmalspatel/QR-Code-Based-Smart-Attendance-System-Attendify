@@ -4,7 +4,7 @@ import axios from "axios";
 import QRCode from "qrcode.react";
 import "../styles/NewSession.css";
 
-const NewSession = ({ togglePopup, onSessionCreated }) => {
+const NewSession = ({ togglePopup, onSessionCreated, selectedSubjectId }) => {
   //eslint-disable-next-line
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [qrtoggle, setQrtoggle] = useState(false);
@@ -14,26 +14,32 @@ const NewSession = ({ togglePopup, onSessionCreated }) => {
   // New academic state
   const [allowedAccess, setAllowedAccess] = useState([]);
   const [academicStructure, setAcademicStructure] = useState({ streams: [] });
+  const [subjects, setSubjects] = useState([]);
   const [selectedStreamId, setSelectedStreamId] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState("");
+  const [selectedSemesterId, setSelectedSemesterId] = useState("");
   const [selectedDivisions, setSelectedDivisions] = useState([]);
+  const [targetSubjectId, setTargetSubjectId] = useState(selectedSubjectId || "");
 
   React.useEffect(() => {
     const fetchData = async () => {
       try {
         const config = { headers: { Authorization: `Bearer ${token}` } };
-        const [accessRes, structureRes] = await Promise.all([
+        const [accessRes, structureRes, subjectRes] = await Promise.all([
           axios.get("/sessions/my-access", config),
-          axios.get("/users/academic-structure")
+          axios.get("/users/academic-structure"),
+          axios.post("/sessions/getSessions", { token }) // This returns subjects
         ]);
         setAllowedAccess(accessRes.data.allowedAccess || []);
         setAcademicStructure(structureRes.data);
+        setSubjects(subjectRes.data.subjects || []);
+        if (selectedSubjectId) setTargetSubjectId(selectedSubjectId);
       } catch (err) {
         console.error("Error fetching access data", err);
       }
     };
     fetchData();
-  }, [token]);
+  }, [token, selectedSubjectId]);
 
   // Derived data
   const filteredStreams = academicStructure.streams.filter(s => 
@@ -44,8 +50,12 @@ const NewSession = ({ togglePopup, onSessionCreated }) => {
     allowedAccess.some(a => a.streamId === selectedStreamId && a.courseId === c._id)
   );
 
+  const filteredSemesters = (academicStructure.streams.find(s => s._id === selectedStreamId)?.courses.find(c => c._id === selectedCourseId)?.semesters || []).filter(sem => 
+    allowedAccess.some(a => a.streamId === selectedStreamId && a.courseId === selectedCourseId && (!a.semesterId || a.semesterId === sem._id))
+  );
+
   const availableDivisions = academicStructure.streams.find(s => s._id === selectedStreamId)
-    ?.courses.find(c => c._id === selectedCourseId)?.divisions || [];
+    ?.courses.find(c => c._id === selectedCourseId)?.semesters.find(sem => sem._id === selectedSemesterId)?.divisions || [];
 
   const handleDivisionChange = (divName) => {
     setSelectedDivisions(prev => 
@@ -56,6 +66,13 @@ const NewSession = ({ togglePopup, onSessionCreated }) => {
   const createQR = async (e) => {
     e.preventDefault();
     setLoading(true);
+
+    if (!targetSubjectId) {
+      alert("Please select a subject first");
+      setLoading(false);
+      return;
+    }
+
     //create a 16 digit UUID
     const uuid = () => {
       return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
@@ -86,17 +103,19 @@ const NewSession = ({ togglePopup, onSessionCreated }) => {
           const locationString = `${latitude},${longitude}`;
           location = locationString.length > 0 ? locationString : "0,0";
           if (name.length > 0 && duration.length > 0) {
-            if (!selectedStreamId || !selectedCourseId || selectedDivisions.length === 0) {
-              alert("Please select Stream, Course and at least one Division");
+            if (!selectedStreamId || !selectedCourseId || !selectedSemesterId || selectedDivisions.length === 0) {
+              alert("Please select Stream, Course, Semester and at least one Division");
               setLoading(false);
               return;
             }
 
             const stream = academicStructure.streams.find(s => s._id === selectedStreamId);
             const course = stream?.courses.find(c => c._id === selectedCourseId);
+            const semester = course?.semesters.find(sem => sem._id === selectedSemesterId);
 
             const formData = {
               token,
+              subject_id: targetSubjectId,
               session_id,
               date,
               time,
@@ -108,6 +127,8 @@ const NewSession = ({ togglePopup, onSessionCreated }) => {
               streamName: stream?.name || "",
               courseId: selectedCourseId,
               courseName: course?.name || "",
+              semesterId: selectedSemesterId,
+              semesterName: semester?.name || "",
               divisions: selectedDivisions
             };
             try {
@@ -122,6 +143,7 @@ const NewSession = ({ togglePopup, onSessionCreated }) => {
             } catch (err) {
               console.log("Error creating session");
               console.log(err);
+              alert(err.response?.data?.message || "Error creating session");
             } finally {
               setLoading(false);
             }
@@ -132,6 +154,7 @@ const NewSession = ({ togglePopup, onSessionCreated }) => {
         },
         (error) => {
           console.error("Error getting geolocation:", error);
+          alert("Location required to create session");
           setLoading(false);
         },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
@@ -161,6 +184,29 @@ const NewSession = ({ togglePopup, onSessionCreated }) => {
 
       {!qrtoggle ? (
         <form onSubmit={createQR} className="modal-body scrollable-content">
+          <div className="form-group">
+            <label className="label">Subject</label>
+            {selectedSubjectId ? (
+              <input 
+                type="text" 
+                value={subjects.find(s => s._id === selectedSubjectId)?.name || "Selected Subject"} 
+                disabled 
+                className="disabled-input"
+              />
+            ) : (
+              <select 
+                value={targetSubjectId} 
+                onChange={(e) => setTargetSubjectId(e.target.value)}
+                required
+              >
+                <option value="">-- Select Subject --</option>
+                {subjects.map(s => (
+                  <option key={s._id} value={s._id}>{s.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
           <div className="form-group">
             <label className="label">Session Name</label>
             <input
@@ -199,7 +245,7 @@ const NewSession = ({ togglePopup, onSessionCreated }) => {
             <div className="academic-selection-grid">
               <select 
                 value={selectedStreamId} 
-                onChange={(e) => { setSelectedStreamId(e.target.value); setSelectedCourseId(""); setSelectedDivisions([]); }}
+                onChange={(e) => { setSelectedStreamId(e.target.value); setSelectedCourseId(""); setSelectedSemesterId(""); setSelectedDivisions([]); }}
                 required
               >
                 <option value="">-- Select Stream --</option>
@@ -210,7 +256,7 @@ const NewSession = ({ togglePopup, onSessionCreated }) => {
 
               <select 
                 value={selectedCourseId} 
-                onChange={(e) => { setSelectedCourseId(e.target.value); setSelectedDivisions([]); }}
+                onChange={(e) => { setSelectedCourseId(e.target.value); setSelectedSemesterId(""); setSelectedDivisions([]); }}
                 disabled={!selectedStreamId}
                 required
               >
@@ -219,10 +265,22 @@ const NewSession = ({ togglePopup, onSessionCreated }) => {
                   <option key={c._id} value={c._id}>{c.name}</option>
                 ))}
               </select>
+
+              <select 
+                value={selectedSemesterId} 
+                onChange={(e) => { setSelectedSemesterId(e.target.value); setSelectedDivisions([]); }}
+                disabled={!selectedCourseId}
+                required
+              >
+                <option value="">-- Select Semester --</option>
+                {filteredSemesters.map(sem => (
+                  <option key={sem._id} value={sem._id}>{sem.name}</option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {selectedCourseId && (
+          {selectedSemesterId && (
             <div className="form-group">
               <label className="label">Select Divisions</label>
               <div className="division-checkboxes">

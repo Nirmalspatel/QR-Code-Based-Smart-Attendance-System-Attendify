@@ -28,6 +28,11 @@ const Landing = () => {
             <Link to="/login" className="btn btn-primary">Login</Link>
             <Link to="/register" className="btn btn-secondary">Get Started</Link>
           </div>
+          <div style={{ marginTop: '20px', textAlign: 'left' }}>
+            <Link to="/admin-login" style={{ color: "var(--text-muted)", textDecoration: "underline", fontSize: "0.95rem", fontWeight: "600" }}>
+              Admin Portal Access &rarr;
+            </Link>
+          </div>
         </div>
         <div className="hero-image-container">
           <div className="hero-blob"></div>

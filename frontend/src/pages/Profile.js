@@ -14,6 +14,8 @@ const Profile = () => {
     streamName: localStorage.getItem("streamName") || "",
     courseId: localStorage.getItem("courseId") || "",
     courseName: localStorage.getItem("courseName") || "",
+    semesterId: localStorage.getItem("semesterId") || "",
+    semesterName: localStorage.getItem("semesterName") || "",
     division: localStorage.getItem("division") || "",
   });
   const [academicStructure, setAcademicStructure] = useState({ streams: [] });
@@ -21,6 +23,7 @@ const Profile = () => {
   const [tempAcademic, setTempAcademic] = useState({
     streamId: userData.streamId,
     courseId: userData.courseId,
+    semesterId: userData.semesterId,
     division: userData.division
   });
   const [selectedFile, setSelectedFile] = useState(null);
@@ -127,12 +130,15 @@ const Profile = () => {
 
     const stream = academicStructure.streams.find(s => s._id === tempAcademic.streamId);
     const course = stream?.courses.find(c => c._id === tempAcademic.courseId);
+    const semester = course?.semesters.find(sem => sem._id === tempAcademic.semesterId);
 
     const updateData = {
       streamId: tempAcademic.streamId,
       streamName: stream?.name || "",
       courseId: tempAcademic.courseId,
       courseName: course?.name || "",
+      semesterId: tempAcademic.semesterId,
+      semesterName: semester?.name || "",
       division: tempAcademic.division
     };
 
@@ -148,6 +154,8 @@ const Profile = () => {
         localStorage.setItem("streamName", updateData.streamName);
         localStorage.setItem("courseId", updateData.courseId);
         localStorage.setItem("courseName", updateData.courseName);
+        localStorage.setItem("semesterId", updateData.semesterId);
+        localStorage.setItem("semesterName", updateData.semesterName);
         localStorage.setItem("division", updateData.division);
         setMessage("Academic group updated successfully!");
         setIsEditingAcademic(false);
@@ -209,28 +217,38 @@ const Profile = () => {
             />
           </div>
 
-          <div className="form-group">
-            <label>Name</label>
-            <input
-              type="text"
-              name="name"
-              value={userData.name}
-              onChange={handleInputChange}
-              required
-            />
-          </div>
+          {userData.type !== "admin" && (
+            <>
+              <div className="form-group">
+                <label>Name</label>
+                <input
+                  type="text"
+                  name="name"
+                  value={userData.name}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Phone Number</label>
+                <input
+                  type="text"
+                  name="pno"
+                  value={userData.pno}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+            </>
+          )}
 
           <div className="form-group">
-            <label>Email (Immutable)</label>
-            <input type="email" value={userData.email} disabled />
-          </div>
-
-          <div className="form-group">
-            <label>Phone Number</label>
+            <label>Email</label>
             <input
-              type="text"
-              name="pno"
-              value={userData.pno}
+              type="email"
+              name="email"
+              value={userData.email}
               onChange={handleInputChange}
               required
             />
@@ -272,7 +290,7 @@ const Profile = () => {
                   <label>Stream</label>
                   <select
                     value={tempAcademic.streamId}
-                    onChange={(e) => setTempAcademic({ ...tempAcademic, streamId: e.target.value, courseId: "", division: "" })}
+                    onChange={(e) => setTempAcademic({ ...tempAcademic, streamId: e.target.value, courseId: "", semesterId: "", division: "" })}
                     required
                   >
                     <option value="">-- Select Stream --</option>
@@ -286,7 +304,7 @@ const Profile = () => {
                   <label>Course</label>
                   <select
                     value={tempAcademic.courseId}
-                    onChange={(e) => setTempAcademic({ ...tempAcademic, courseId: e.target.value, division: "" })}
+                    onChange={(e) => setTempAcademic({ ...tempAcademic, courseId: e.target.value, semesterId: "", division: "" })}
                     disabled={!tempAcademic.streamId}
                     required
                   >
@@ -298,16 +316,34 @@ const Profile = () => {
                 </div>
 
                 <div className="form-group">
+                  <label>Semester</label>
+                  <select
+                    value={tempAcademic.semesterId}
+                    onChange={(e) => setTempAcademic({ ...tempAcademic, semesterId: e.target.value, division: "" })}
+                    disabled={!tempAcademic.courseId}
+                    required
+                  >
+                    <option value="">-- Select Semester --</option>
+                    {academicStructure.streams.find(s => s._id === tempAcademic.streamId)
+                      ?.courses.find(c => c._id === tempAcademic.courseId)
+                      ?.semesters.map(sem => (
+                        <option key={sem._id} value={sem._id}>{sem.name}</option>
+                      ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
                   <label>Division</label>
                   <select
                     value={tempAcademic.division}
                     onChange={(e) => setTempAcademic({ ...tempAcademic, division: e.target.value })}
-                    disabled={!tempAcademic.courseId}
+                    disabled={!tempAcademic.semesterId}
                     required
                   >
                     <option value="">-- Select Division --</option>
                     {academicStructure.streams.find(s => s._id === tempAcademic.streamId)
                       ?.courses.find(c => c._id === tempAcademic.courseId)
+                      ?.semesters.find(sem => sem._id === tempAcademic.semesterId)
                       ?.divisions.map(d => (
                         <option key={d._id} value={d.name}>{d.name}</option>
                       ))}
@@ -323,6 +359,7 @@ const Profile = () => {
                     setTempAcademic({
                       streamId: userData.streamId,
                       courseId: userData.courseId,
+                      semesterId: userData.semesterId,
                       division: userData.division
                     });
                   }}>
@@ -339,6 +376,10 @@ const Profile = () => {
                 <div className="display-row">
                   <span className="label">Course:</span>
                   <span className="value">{userData.courseName || "Not Set"}</span>
+                </div>
+                <div className="display-row">
+                  <span className="label">Semester:</span>
+                  <span className="value">{userData.semesterName || "Not Set"}</span>
                 </div>
                 <div className="display-row">
                   <span className="label">Division:</span>

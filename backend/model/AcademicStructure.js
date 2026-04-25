@@ -5,9 +5,14 @@ const divisionSchema = new schema({
   name: { type: String, required: true },
 });
 
-const courseSchema = new schema({
+const semesterSchema = new schema({
   name: { type: String, required: true },
   divisions: [divisionSchema],
+});
+
+const courseSchema = new schema({
+  name: { type: String, required: true },
+  semesters: [semesterSchema],
 });
 
 const streamSchema = new schema({

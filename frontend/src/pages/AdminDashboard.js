@@ -6,8 +6,9 @@ import StreamManager from "./StreamManager";
 import TeacherAccessManager from "./TeacherAccessManager";
 import StudentStatsModal from "./StudentStatsModal";
 import TeacherSessionsModal from "./TeacherSessionsModal";
+import DomainManager from "./DomainManager";
+import io from "socket.io-client";
 import "../styles/StudentStatsModal.css";
-import "../styles/TeacherSessionsModal.css";
 
 const AdminDashboard = () => {
   const [students, setStudents] = useState([]);
@@ -27,6 +28,7 @@ const AdminDashboard = () => {
   const [studentPath, setStudentPath] = useState({ 
     stream: null, 
     course: null, 
+    semester: null,
     division: null 
   });
 
@@ -37,7 +39,6 @@ const AdminDashboard = () => {
   });
 
   const navigate = useNavigate();
-
   const token = localStorage.getItem("token");
 
   useEffect(() => {
@@ -51,8 +52,33 @@ const AdminDashboard = () => {
       return;
     }
     fetchData();
+
+    // Socket.io initialization
+    const SOCKET_URL = process.env.REACT_APP_API_BASE_URL || "";
+    const socket = io(SOCKET_URL || "http://localhost:5051", {
+      withCredentials: true,
+      transports: ["websocket", "polling"]
+    });
+
+    socket.on("connect", () => {
+      console.log("[SOCKET] Admin connected");
+    });
+
+    const handleRefresh = () => {
+      console.log("[SOCKET] Refreshing data due to real-time event");
+      fetchData();
+    };
+
+    socket.on("user-signup", handleRefresh);
+    socket.on("session-created", handleRefresh);
+    socket.on("admin-activity", handleRefresh);
+
+    return () => {
+      socket.disconnect();
+    };
     // eslint-disable-next-line
   }, [token, navigate]);
+
 
   const fetchData = async () => {
     setLoading(true);
@@ -264,14 +290,15 @@ const AdminDashboard = () => {
   const handleStudentPath = (key, value) => {
     setStudentPath(prev => {
       const next = { ...prev, [key]: value };
-      if (key === 'stream') { next.course = null; next.division = null; }
-      if (key === 'course') { next.division = null; }
+      if (key === 'stream') { next.course = null; next.semester = null; next.division = null; }
+      if (key === 'course') { next.semester = null; next.division = null; }
+      if (key === 'semester') { next.division = null; }
       return next;
     });
   };
 
   const renderStudentHierarchy = () => {
-    const { stream, course, division } = studentPath;
+    const { stream, course, semester, division } = studentPath;
 
     // Search Mode for Students
     if (searchTerm.trim().length > 0) {
@@ -301,7 +328,7 @@ const AdminDashboard = () => {
                   <td>{student.email}</td>
                   <td>
                     <small>{student.streamName}</small><br/>
-                    <strong>{student.courseName} ({student.division})</strong>
+                    <strong>{student.courseName} - {student.semesterName} ({student.division})</strong>
                   </td>
                   <td>
                     <div className="btn-group-admin">
@@ -349,7 +376,7 @@ const AdminDashboard = () => {
               <div className="card-icon">🎓</div>
               <div className="card-info">
                 <h3>{c.name}</h3>
-                <p>{c.divisions?.length || 0} Divisions</p>
+                <p>{c.semesters?.length || 0} Semesters</p>
               </div>
             </div>
           ))}
@@ -358,11 +385,29 @@ const AdminDashboard = () => {
       );
     }
 
-    // 3. Show Divisions
+    // 3. Show Semesters
+    if (!semester) {
+      return (
+        <div className="hierarchy-grid">
+          {course.semesters.map(s => (
+            <div key={s._id} className="hierarchy-card" onClick={() => handleStudentPath('semester', s)}>
+              <div className="card-icon">📆</div>
+              <div className="card-info">
+                <h3>{s.name}</h3>
+                <p>{s.divisions?.length || 0} Divisions</p>
+              </div>
+            </div>
+          ))}
+          {course.semesters.length === 0 && <p className="empty-message">No semesters found in this course.</p>}
+        </div>
+      );
+    }
+
+    // 4. Show Divisions
     if (!division) {
       return (
         <div className="hierarchy-grid">
-          {course.divisions.map(d => (
+          {semester.divisions.map(d => (
             <div key={d._id} className="hierarchy-card" onClick={() => handleStudentPath('division', d)}>
               <div className="card-icon">📂</div>
               <div className="card-info">
@@ -371,15 +416,16 @@ const AdminDashboard = () => {
               </div>
             </div>
           ))}
-          {course.divisions.length === 0 && <p className="empty-message">No divisions found in this course.</p>}
+          {semester.divisions.length === 0 && <p className="empty-message">No divisions found in this semester.</p>}
         </div>
       );
     }
 
-    // 4. Show Students
+    // 5. Show Students
     const filteredStudents = students.filter(s => 
       s.streamId === stream._id && 
       s.courseId === course._id && 
+      s.semesterId === semester._id &&
       s.division === division.name
     );
 
@@ -423,6 +469,45 @@ const AdminDashboard = () => {
     );
   };
 
+  const getFilteredStudentCount = () => {
+    if (searchTerm.trim().length > 0) {
+      return students.filter(s => 
+        s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.regno?.toLowerCase().includes(searchTerm.toLowerCase())
+      ).length;
+    }
+    const { stream, course, semester, division } = studentPath;
+    if (!stream && !course && !semester && !division) return students.length;
+    
+    return students.filter(s => {
+      const matchStream = !stream || s.streamId === stream._id;
+      const matchCourse = !course || s.courseId === course._id;
+      const matchSemester = !semester || s.semesterId === semester._id;
+      const matchDiv = !division || s.division === division.name;
+      return matchStream && matchCourse && matchSemester && matchDiv;
+    }).length;
+  };
+
+  const getFilteredTeacherCount = () => {
+    if (searchTerm.trim().length > 0) {
+      return teachers.filter(t => 
+        t.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        t.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.pno?.includes(searchTerm)
+      ).length;
+    }
+    const { stream, course } = teacherPath;
+    if (!stream && !course) return teachers.length;
+    
+    return teachers.filter(t => 
+      (t.allowedAccess || []).some(a => 
+        (!stream || a.streamId === stream._id) && 
+        (!course || a.courseId === course._id)
+      )
+    ).length;
+  };
+
   return (
     <div className="admin-dash-container">
       <div className="admin-header">
@@ -435,19 +520,23 @@ const AdminDashboard = () => {
           className={`AdminTabBtn ${activeTab === "students" ? "active" : ""}`}
           onClick={() => setActiveTab("students")}
         >
-          Students ({students.length})
+          Students ({getFilteredStudentCount()})
         </button>
         <button
           className={`AdminTabBtn ${activeTab === "teachers" ? "active" : ""}`}
           onClick={() => setActiveTab("teachers")}
         >
-          Teachers ({teachers.length})
+          Teachers ({getFilteredTeacherCount()})
         </button>
         <button
           className={`AdminTabBtn ${activeTab === "sessions" ? "active" : ""}`}
           onClick={() => setActiveTab("sessions")}
         >
-          Sessions ({sessions.length})
+          Sessions ({sessions.filter(s => 
+            searchTerm === "" || 
+            s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+            s.teacherName.toLowerCase().includes(searchTerm.toLowerCase())
+          ).length})
         </button>
         <button
           className={`AdminTabBtn ${activeTab === "academic" ? "active" : ""}`}
@@ -460,6 +549,12 @@ const AdminDashboard = () => {
           onClick={() => setActiveTab("access")}
         >
           Teacher Access
+        </button>
+        <button
+          className={`AdminTabBtn ${activeTab === "settings" ? "active" : ""}`}
+          onClick={() => setActiveTab("settings")}
+        >
+          ⚙️ Settings
         </button>
       </div>
 
@@ -492,7 +587,7 @@ const AdminDashboard = () => {
             {activeTab === "students" ? (
           <div className="student-browser-container">
             <div className="browser-path-nav">
-              <button className={`path-crumb ${!studentPath.stream ? 'active' : ''}`} onClick={() => setStudentPath({ stream: null, course: null, division: null })}>
+              <button className={`path-crumb ${!studentPath.stream ? 'active' : ''}`} onClick={() => setStudentPath({ stream: null, course: null, semester: null, division: null })}>
                 All Streams
               </button>
               {studentPath.stream && (
@@ -506,15 +601,23 @@ const AdminDashboard = () => {
               {studentPath.course && (
                 <>
                   <span className="path-sep">/</span>
-                  <button className={`path-crumb ${!studentPath.division ? 'active' : ''}`} onClick={() => handleStudentPath('course', studentPath.course)}>
+                  <button className={`path-crumb ${!studentPath.semester ? 'active' : ''}`} onClick={() => handleStudentPath('course', studentPath.course)}>
                     {studentPath.course.name}
+                  </button>
+                </>
+              )}
+              {studentPath.semester && (
+                <>
+                  <span className="path-sep">/</span>
+                  <button className={`path-crumb ${!studentPath.division ? 'active' : ''}`} onClick={() => handleStudentPath('semester', studentPath.semester)}>
+                    {studentPath.semester.name}
                   </button>
                 </>
               )}
               {studentPath.division && (
                 <>
                   <span className="path-sep">/</span>
-                  <span className="path-crumb active">Division {studentPath.division.name}</span>
+                  <span className="path-crumb active">{studentPath.division.name}</span>
                 </>
               )}
             </div>
@@ -558,6 +661,10 @@ const AdminDashboard = () => {
                onRefresh={fetchData}
                token={token}
              />
+          </div>
+        ) : activeTab === "settings" ? (
+          <div className="admin-academic-container">
+            <DomainManager token={token} />
           </div>
         ) : activeTab === "access" ? (
           <div className="data-table-container">
@@ -613,7 +720,8 @@ const AdminDashboard = () => {
               <thead>
                 <tr>
                   <th>Teacher</th>
-                  <th>Session Name</th>
+                  <th>Session & Subject</th>
+                  <th>Academic Group</th>
                   <th>Date</th>
                   <th>Time</th>
                   <th>Attendees</th>
@@ -631,10 +739,18 @@ const AdminDashboard = () => {
                   .map((session) => (
                     <tr key={session.session_id}>
                       <td>{session.teacherName}<br /><small style={{ color: "#888" }}>{session.teacherEmail}</small></td>
-                      <td>{session.name}</td>
+                      <td>
+                        <strong>{session.name}</strong><br/>
+                        <small style={{color: '#818cf8', fontWeight: '600'}}>{session.subjectName}</small>
+                      </td>
+                      <td>
+                        <small>{session.streamName}</small><br/>
+                        <small>{session.courseName} - {session.semesterName}</small><br/>
+                        <strong style={{fontSize: '11px'}}>Div: {(session.divisions || []).join(", ")}</strong>
+                      </td>
                       <td>{new Date(session.date).toLocaleDateString()}</td>
                       <td>{session.time}</td>
-                      <td>{session.attendance?.length || 0}</td>
+                      <td className="session-count-cell">{session.attendance?.length || 0}</td>
                       <td>
                         <button className="del-btn" onClick={() => handleDeleteSession(session.teacherEmail, session.session_id)}>
                           Delete

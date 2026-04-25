@@ -20,6 +20,7 @@ const Signup = () => {
   const [academicStructure, setAcademicStructure] = useState({ streams: [] });
   const [selectedStreamId, setSelectedStreamId] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState("");
+  const [selectedSemesterId, setSelectedSemesterId] = useState("");
   const [selectedDivision, setSelectedDivision] = useState("");
   const navigate = useNavigate();
 
@@ -65,6 +66,8 @@ const Signup = () => {
           streamName: type === 'student' ? academicStructure.streams.find(s => s._id === selectedStreamId)?.name : "",
           courseId: type === 'student' ? selectedCourseId : null,
           courseName: type === 'student' ? academicStructure.streams.find(s => s._id === selectedStreamId)?.courses.find(c => c._id === selectedCourseId)?.name : "",
+          semesterId: type === 'student' ? selectedSemesterId : null,
+          semesterName: type === 'student' ? academicStructure.streams.find(s => s._id === selectedStreamId)?.courses.find(c => c._id === selectedCourseId)?.semesters.find(sem => sem._id === selectedSemesterId)?.name : "",
           division: type === 'student' ? selectedDivision : "",
         };
         try {
@@ -99,8 +102,8 @@ const Signup = () => {
     }
 
     if (userType === 'student') {
-      if (!selectedStreamId || !selectedCourseId || !selectedDivision) {
-        alert("Please select your stream, course and division");
+      if (!selectedStreamId || !selectedCourseId || !selectedSemesterId || !selectedDivision) {
+        alert("Please select your stream, course, semester and division");
         return;
       }
     }
@@ -175,7 +178,6 @@ const Signup = () => {
                 <select name="type" id="type" onChange={(e) => setUserType(e.target.value)}>
                   <option value="student">Student</option>
                   <option value="teacher">Teacher</option>
-                  <option value="admin">Admin</option>
                 </select>
                 <input
                   type="text"
@@ -203,7 +205,7 @@ const Signup = () => {
                     <select 
                       name="stream" 
                       value={selectedStreamId} 
-                      onChange={(e) => { setSelectedStreamId(e.target.value); setSelectedCourseId(""); setSelectedDivision(""); }}
+                      onChange={(e) => { setSelectedStreamId(e.target.value); setSelectedCourseId(""); setSelectedSemesterId(""); setSelectedDivision(""); }}
                       required
                     >
                       <option value="">-- Select Stream --</option>
@@ -216,7 +218,7 @@ const Signup = () => {
                       <select 
                         name="course" 
                         value={selectedCourseId} 
-                        onChange={(e) => { setSelectedCourseId(e.target.value); setSelectedDivision(""); }}
+                        onChange={(e) => { setSelectedCourseId(e.target.value); setSelectedSemesterId(""); setSelectedDivision(""); }}
                         required
                       >
                         <option value="">-- Select Course --</option>
@@ -228,6 +230,22 @@ const Signup = () => {
 
                     {selectedCourseId && (
                       <select 
+                        name="semester" 
+                        value={selectedSemesterId} 
+                        onChange={(e) => { setSelectedSemesterId(e.target.value); setSelectedDivision(""); }}
+                        required
+                      >
+                        <option value="">-- Select Semester --</option>
+                        {academicStructure.streams.find(s => s._id === selectedStreamId)
+                          ?.courses.find(c => c._id === selectedCourseId)
+                          ?.semesters.map(sem => (
+                            <option key={sem._id} value={sem._id}>{sem.name}</option>
+                          ))}
+                      </select>
+                    )}
+
+                    {selectedSemesterId && (
+                      <select 
                         name="division" 
                         value={selectedDivision} 
                         onChange={(e) => setSelectedDivision(e.target.value)}
@@ -236,6 +254,7 @@ const Signup = () => {
                         <option value="">-- Select Division --</option>
                         {academicStructure.streams.find(s => s._id === selectedStreamId)
                           ?.courses.find(c => c._id === selectedCourseId)
+                          ?.semesters.find(sem => sem._id === selectedSemesterId)
                           ?.divisions.map(d => (
                             <option key={d._id} value={d.name}>{d.name}</option>
                           ))}

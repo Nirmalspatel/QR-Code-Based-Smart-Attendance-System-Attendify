@@ -4,6 +4,7 @@ import axios from "axios";
 import QRCode from "qrcode.react";
 import * as XLSX from "xlsx";
 import "../styles/SessionDetails.css";
+import io from "socket.io-client";
 
 const SessionDetails = (props) => {
   const [qr, setQR] = useState("");
@@ -40,6 +41,36 @@ const SessionDetails = (props) => {
       setLoadingRoster(false);
     }
   };
+
+  useEffect(() => {
+    // Socket.io for Real-time Roster Updates
+    const SOCKET_URL = process.env.REACT_APP_API_BASE_URL || "";
+    const socket = io(SOCKET_URL || "http://localhost:5051", {
+      withCredentials: true,
+      transports: ["websocket", "polling"]
+    });
+
+    const email = localStorage.getItem("email");
+
+    socket.on("connect", () => {
+      console.log("[SOCKET] SessionDetails connected");
+      if (email) {
+        socket.emit("join-room", email);
+      }
+    });
+
+    socket.on("attendance-marked", (payload) => {
+      console.log("[SOCKET] Attendance update received for session:", payload.session_id);
+      // Only refresh if the update is for THIS session
+      if (initialSession && payload.session_id === initialSession.session_id) {
+        fetchRoster();
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [initialSession?.session_id]);
 
   async function getQR() {
     if (!sessionMetadata?.session_id) return;
@@ -161,6 +192,7 @@ const SessionDetails = (props) => {
     fetchRoster();
   }, [isExpired]);
 
+
   const presentCount = roster.filter(r => r.attended).length;
   const totalCount = roster.length;
   const absentCount = totalCount - presentCount;
@@ -208,7 +240,7 @@ const SessionDetails = (props) => {
                 {isExpired ? (
                   <div className="qr-locked-sidebar">
                     <p>Attendance Closed</p>
-                    <button onClick={handleReopenSession} className="btn-reopen-mini" disabled={expiring}>
+                    <button onClick={handleReopenSession} className="link-text" disabled={expiring}>
                       {expiring ? "..." : "Re-open"}
                     </button>
                   </div>
@@ -328,9 +360,7 @@ const SessionDetails = (props) => {
                           </td>
                           <td className="join-time">
                             {row.attended && att?.date ? (
-                              att.date.includes("T") 
-                                ? att.date.split("T")[1].split(".")[0] 
-                                : "—"
+                              new Date(att.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
                             ) : "—"}
                           </td>
                           <td className="photo-cell">

@@ -15,6 +15,8 @@ router.post("/sendmail", UserController.SendMail);
 router.post("/updateprofile", JWT.verifyToken, upload.single("profileImage"), UserController.UpdateProfile);
 // public: academic structure for signup dropdowns (no auth required)
 router.get("/academic-structure", UserController.GetPublicAcademicStructure);
+// public: allowed email domains hint for signup page (no auth required)
+router.get("/allowed-domains", UserController.GetPublicAllowedDomains);
 // student: update academic group (stream/course/division) — auth required
 router.put("/update-academic", JWT.verifyToken, UserController.UpdateAcademicGroup);
 

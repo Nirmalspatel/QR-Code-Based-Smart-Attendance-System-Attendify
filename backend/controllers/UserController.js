@@ -5,8 +5,28 @@ import { Student } from "../model/Student.js";
 import { Teacher } from "../model/Teacher.js";
 import { Admin } from "../model/Admin.js";
 import { AcademicStructure } from "../model/AcademicStructure.js";
+import { SystemConfig } from "../model/SystemConfig.js";
 import JWT from "../middleware/JWT.js";
 import uploadImage from "../middleware/Cloudinary.js";
+import { getIO } from "../socket.js";
+
+
+// Helper: check if an email's domain is in the allowed list.
+// Returns null if allowed, or an error message string if blocked.
+async function checkDomain(email) {
+  try {
+    const cfg = await SystemConfig.findOne({ key: "global" });
+    if (!cfg || cfg.allowedDomains.length === 0) return null; // no restriction
+    const emailDomain = email.split("@")[1]?.toLowerCase();
+    if (!emailDomain) return "Invalid email format";
+    if (!cfg.allowedDomains.includes(emailDomain)) {
+      return `Only emails from @${cfg.allowedDomains.join(", @")} are allowed to register.`;
+    }
+    return null;
+  } catch {
+    return null; // fail open on DB error — don't block auth
+  }
+}
 
 //login
 async function Login(req, res) {
@@ -24,6 +44,13 @@ async function Login(req, res) {
   }
 
   if (user) {
+    // Domain check — admins are exempt
+    if (type !== "admin") {
+      const domainError = await checkDomain(email);
+      if (domainError) {
+        return res.status(403).json({ message: domainError });
+      }
+    }
     if (user.password === password) {
       const token = JWT.generateToken({ email: user.email });
       user.type = type;
@@ -44,6 +71,15 @@ async function Login(req, res) {
 // Create a new user
 async function Signup(req, res) {
   const { name, email, pno, password, type, regno } = req.body;
+
+  // Domain check — admins cannot sign up via this endpoint anyway
+  if (type !== "admin") {
+    const domainError = await checkDomain(email);
+    if (domainError) {
+      return res.status(403).json({ message: domainError });
+    }
+  }
+
   if (type === "student") {
     const user = new Student({
       name,
@@ -55,6 +91,8 @@ async function Signup(req, res) {
       streamName: req.body.streamName || "",
       courseId: req.body.courseId || null,
       courseName: req.body.courseName || "",
+      semesterId: req.body.semesterId || null,
+      semesterName: req.body.semesterName || "",
       division: req.body.division || "",
     });
     try {
@@ -63,6 +101,12 @@ async function Signup(req, res) {
         return res.status(400).json({ message: "User already exists" });
       } else {
         const newUser = await user.save();
+        // Emit real-time event for admins
+        try {
+          getIO().emit("user-signup", { type: "student", email: newUser.email, name: newUser.name });
+        } catch (socketErr) {
+          console.error("[SOCKET ERROR] Failed to emit student user-signup:", socketErr.message);
+        }
         res.status(201).json(newUser);
       }
     } catch (err) {
@@ -81,29 +125,19 @@ async function Signup(req, res) {
         return res.status(400).json({ message: "User already exists" });
       } else {
         const newUser = await user.save();
+        // Emit real-time event for admins
+        try {
+          getIO().emit("user-signup", { type: "teacher", email: newUser.email, name: newUser.name });
+        } catch (socketErr) {
+          console.error("[SOCKET ERROR] Failed to emit teacher user-signup:", socketErr.message);
+        }
         res.status(201).json(newUser);
       }
     } catch (err) {
       res.status(400).json({ message: err.message });
     }
   } else if (type === "admin") {
-    const user = new Admin({
-      name: name,
-      email: email,
-      pno: pno,
-      password: password,
-    });
-    try {
-      const existingUser = await Admin.findOne({ email: email }).exec();
-      if (existingUser) {
-        return res.status(400).json({ message: "User already exists" });
-      } else {
-        const newUser = await user.save();
-        res.status(201).json(newUser);
-      }
-    } catch (err) {
-      res.status(400).json({ message: err.message });
-    }
+    return res.status(403).json({ message: "Admin registration is not allowed via this endpoint." });
   }
 }
 
@@ -118,15 +152,25 @@ async function GetPublicAcademicStructure(req, res) {
   }
 }
 
-// Student: update their academic grouping (stream/course/division)
+// Public: return allowed email domains (no auth) — used by signup page for hint
+async function GetPublicAllowedDomains(req, res) {
+  try {
+    const cfg = await SystemConfig.findOne({ key: "global" });
+    res.status(200).json({ allowedDomains: cfg ? cfg.allowedDomains : [] });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching domain settings", error: error.message });
+  }
+}
+
+// Student: update their academic grouping (stream/course/semester/division)
 async function UpdateAcademicGroup(req, res) {
   try {
     const tokenData = req.user;
-    const { streamId, streamName, courseId, courseName, division } = req.body;
+    const { streamId, streamName, courseId, courseName, semesterId, semesterName, division } = req.body;
 
     const student = await Student.findOneAndUpdate(
       { email: tokenData.email },
-      { streamId, streamName, courseId, courseName, division },
+      { streamId, streamName, courseId, courseName, semesterId, semesterName, division },
       { new: true }
     );
 
@@ -139,6 +183,8 @@ async function UpdateAcademicGroup(req, res) {
         streamName: student.streamName,
         courseId: student.courseId,
         courseName: student.courseName,
+        semesterId: student.semesterId,
+        semesterName: student.semesterName,
         division: student.division,
       },
     });
@@ -231,10 +277,21 @@ function SendMail(req, res) {
   });
 
   const mailOptions = {
-    from: process.env.EMAIL,
+    from: `"Smart Attendance System" <${process.env.EMAIL}>`,
     to: email,
-    subject: "Atendo Verification Code",
-    text: `Your OTP is ${otp}`,
+    subject: "Verification Code - Smart Attendance System",
+    text: `Hello!
+
+Thank you for choosing the Smart Attendance System.
+
+Your verification code is: ${otp}
+
+Please enter this code on our website to complete your registration or verification process. This code will expire soon.
+
+If you did not request this code, please ignore this email.
+
+Best regards,
+The Smart Attendance System Team`,
   };
 
   transporter.sendMail(mailOptions, (error, info) => {
@@ -260,6 +317,7 @@ const UserController = {
   UpdateProfile,
   SendMail,
   GetPublicAcademicStructure,
+  GetPublicAllowedDomains,
   UpdateAcademicGroup,
 };
 

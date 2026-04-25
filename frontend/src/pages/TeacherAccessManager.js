@@ -14,7 +14,8 @@ import "../styles/TeacherAccess.css";
 const TeacherAccessManager = ({ teacher, structure, token, onClose, onRefresh }) => {
   const [currentAccess, setCurrentAccess] = useState(teacher.allowedAccess || []);
   const [selectedStreamId, setSelectedStreamId] = useState("");
-  const [selectedCourseIds, setSelectedCourseIds] = useState([]);
+  const [selectedCourseId, setSelectedCourseId] = useState("");
+  const [selectedSemesterIds, setSelectedSemesterIds] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -24,29 +25,34 @@ const TeacherAccessManager = ({ teacher, structure, token, onClose, onRefresh })
 
   // Courses available for the selected stream
   const availableCourses = streams.find((s) => s._id === selectedStreamId)?.courses || [];
+  // Semesters available for the selected course
+  const availableSemesters = availableCourses.find((c) => c._id === selectedCourseId)?.semesters || [];
 
-  const toggleCourse = (courseId) => {
-    setSelectedCourseIds((prev) =>
-      prev.includes(courseId) ? prev.filter((id) => id !== courseId) : [...prev, courseId]
+  const toggleSemester = (semesterId) => {
+    setSelectedSemesterIds((prev) =>
+      prev.includes(semesterId) ? prev.filter((id) => id !== semesterId) : [...prev, semesterId]
     );
   };
 
   const handleGrant = async () => {
-    if (!selectedStreamId || selectedCourseIds.length === 0) {
-      setError("Select a stream and at least one course.");
+    if (!selectedStreamId || !selectedCourseId || selectedSemesterIds.length === 0) {
+      setError("Select a stream, course, and at least one semester.");
       return;
     }
     setError("");
     setLoading(true);
 
     const stream = streams.find((s) => s._id === selectedStreamId);
-    const accesses = selectedCourseIds.map((courseId) => {
-      const course = stream.courses.find((c) => c._id === courseId);
+    const course = stream.courses.find((c) => c._id === selectedCourseId);
+    const accesses = selectedSemesterIds.map((semesterId) => {
+      const semester = course.semesters.find((sem) => sem._id === semesterId);
       return {
         streamId: stream._id,
         streamName: stream.name,
         courseId: course._id,
         courseName: course.name,
+        semesterId: semester._id,
+        semesterName: semester.name,
       };
     });
 
@@ -58,7 +64,8 @@ const TeacherAccessManager = ({ teacher, structure, token, onClose, onRefresh })
       );
       setCurrentAccess(res.data.allowedAccess);
       setSelectedStreamId("");
-      setSelectedCourseIds([]);
+      setSelectedCourseId("");
+      setSelectedSemesterIds([]);
       setSuccess("Access granted!");
       setTimeout(() => setSuccess(""), 2500);
       onRefresh();
@@ -69,13 +76,13 @@ const TeacherAccessManager = ({ teacher, structure, token, onClose, onRefresh })
     }
   };
 
-  const handleRevoke = async (streamId, courseId, courseName) => {
-    if (!window.confirm(`Remove access to "${courseName}"?`)) return;
+  const handleRevoke = async (streamId, courseId, semesterId, itemName) => {
+    if (!window.confirm(`Remove access to "${itemName}"?`)) return;
     setLoading(true);
     try {
       const res = await axios.delete(`/admin/teacher/${teacher._id}/access`, {
         ...cfg,
-        data: { streamId, courseId },
+        data: { streamId, courseId, semesterId },
       });
       setCurrentAccess(res.data.allowedAccess);
       setSuccess("Access revoked.");
@@ -114,10 +121,12 @@ const TeacherAccessManager = ({ teacher, structure, token, onClose, onRefresh })
                       <span className="tam-stream-tag">{a.streamName}</span>
                       <span className="tam-arrow">→</span>
                       <span className="tam-course-tag">{a.courseName}</span>
+                      <span className="tam-arrow">→</span>
+                      <span className="tam-course-tag" style={{backgroundColor: '#e0e7ff', color: '#3730a3'}}>{a.semesterName}</span>
                     </div>
                     <button
                       className="tam-revoke-btn"
-                      onClick={() => handleRevoke(a.streamId, a.courseId, a.courseName)}
+                      onClick={() => handleRevoke(a.streamId, a.courseId, a.semesterId, a.semesterName)}
                       disabled={loading}
                     >
                       Revoke
@@ -137,7 +146,7 @@ const TeacherAccessManager = ({ teacher, structure, token, onClose, onRefresh })
             <select
               className="tam-select"
               value={selectedStreamId}
-              onChange={(e) => { setSelectedStreamId(e.target.value); setSelectedCourseIds([]); }}
+              onChange={(e) => { setSelectedStreamId(e.target.value); setSelectedCourseId(""); setSelectedSemesterIds([]); }}
             >
               <option value="">-- Choose a Stream --</option>
               {streams.map((s) => (
@@ -145,34 +154,52 @@ const TeacherAccessManager = ({ teacher, structure, token, onClose, onRefresh })
               ))}
             </select>
 
-            {/* Course multi-select */}
+            {/* Course selector */}
             {selectedStreamId && (
               <>
+                <label className="tam-label" style={{ marginTop: 14 }}>Select Course</label>
+                <select
+                  className="tam-select"
+                  value={selectedCourseId}
+                  onChange={(e) => { setSelectedCourseId(e.target.value); setSelectedSemesterIds([]); }}
+                >
+                  <option value="">-- Choose a Course --</option>
+                  {availableCourses.map((c) => (
+                    <option key={c._id} value={c._id}>{c.name}</option>
+                  ))}
+                </select>
+              </>
+            )}
+
+            {/* Semester multi-select */}
+            {selectedCourseId && (
+              <>
                 <label className="tam-label" style={{ marginTop: 14 }}>
-                  Select Courses <span className="tam-hint">(pick one or more)</span>
+                  Select Semesters <span className="tam-hint">(pick one or more)</span>
                 </label>
                 <div className="tam-course-grid">
-                  {availableCourses.length === 0 ? (
-                    <p className="tam-empty">No courses in this stream.</p>
+                  {availableSemesters.length === 0 ? (
+                    <p className="tam-empty">No semesters in this course.</p>
                   ) : (
-                    availableCourses.map((c) => {
+                    availableSemesters.map((sem) => {
                       const isAlreadyGranted = currentAccess.some(
                         (a) =>
                           a.streamId?.toString() === selectedStreamId &&
-                          a.courseId?.toString() === c._id
+                          a.courseId?.toString() === selectedCourseId &&
+                          a.semesterId?.toString() === sem._id
                       );
                       return (
                         <label
-                          key={c._id}
-                          className={`tam-course-chip ${selectedCourseIds.includes(c._id) ? "selected" : ""} ${isAlreadyGranted ? "granted" : ""}`}
+                          key={sem._id}
+                          className={`tam-course-chip ${selectedSemesterIds.includes(sem._id) ? "selected" : ""} ${isAlreadyGranted ? "granted" : ""}`}
                         >
                           <input
                             type="checkbox"
-                            checked={selectedCourseIds.includes(c._id)}
-                            onChange={() => toggleCourse(c._id)}
+                            checked={selectedSemesterIds.includes(sem._id)}
+                            onChange={() => toggleSemester(sem._id)}
                             disabled={isAlreadyGranted}
                           />
-                          <span>{c.name}</span>
+                          <span>{sem.name}</span>
                           {isAlreadyGranted && <span className="tam-already">✓ Granted</span>}
                         </label>
                       );
@@ -188,9 +215,9 @@ const TeacherAccessManager = ({ teacher, structure, token, onClose, onRefresh })
             <button
               className="tam-grant-btn"
               onClick={handleGrant}
-              disabled={loading || !selectedStreamId || selectedCourseIds.length === 0}
+              disabled={loading || !selectedStreamId || !selectedCourseId || selectedSemesterIds.length === 0}
             >
-              {loading ? "Saving..." : `Grant Access (${selectedCourseIds.length} course${selectedCourseIds.length !== 1 ? "s" : ""})`}
+              {loading ? "Saving..." : `Grant Access (${selectedSemesterIds.length} semester${selectedSemesterIds.length !== 1 ? "s" : ""})`}
             </button>
           </div>
         </div>

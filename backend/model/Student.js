@@ -14,10 +14,13 @@ const userSchema = new schema(
     streamName: { type: String, default: "" },
     courseId: { type: schema.Types.ObjectId, default: null },
     courseName: { type: String, default: "" },
+    semesterId: { type: schema.Types.ObjectId, default: null },
+    semesterName: { type: String, default: "" },
     division: { type: String, default: "" },
     sessions: [
       {
         session_id: { type: String, required: true },
+        subjectName: { type: String, default: "General" },
         date: { type: String, required: true },
         time: { type: String, required: true },
         name: { type: String, required: true },

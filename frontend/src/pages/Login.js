@@ -161,8 +161,14 @@ const Login = () => {
 
           <p className="login-bottom-p">
             Don't have an account?{" "}
-            <Link to="/register" style={{ color: "#76ABAE" }}>
+            <Link to="/register" style={{ color: "var(--primary-color)" }}>
               Sign Up
+            </Link>
+          </p>
+          <p className="login-bottom-p" style={{ marginTop: '10px', fontSize: '0.9rem' }}>
+            System Administrator?{" "}
+            <Link to="/admin-login" style={{ color: "var(--text-muted)", textDecoration: "underline" }}>
+              Admin Portal
             </Link>
           </p>
         </div>

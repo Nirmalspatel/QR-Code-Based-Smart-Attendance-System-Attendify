@@ -3,7 +3,7 @@ import React, { useState, useRef } from "react";
 import axios from "axios";
 import "../styles/StudentForm.css";
 
-const StudentForm = ({ togglePopup }) => {
+const StudentForm = ({ togglePopup, onSuccess }) => {
   //eslint-disable-next-line
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [image, setImage] = useState({ contentType: "", data: "" });
@@ -33,13 +33,19 @@ const StudentForm = ({ togglePopup }) => {
       });
   };
   const stopCamera = () => {
-    const stream = videoRef.current.srcObject;
-    const tracks = stream.getTracks();
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject;
+      const tracks = stream.getTracks();
 
-    tracks.forEach((track) => track.stop());
-    videoRef.current.srcObject = null;
+      tracks.forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
+    }
   };
   const capturePhoto = async () => {
+    if (!videoRef.current || !videoRef.current.srcObject) {
+      alert("Please start the camera first!");
+      return;
+    }
     const canvas = document.createElement("canvas");
     canvas.width = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;
@@ -113,9 +119,12 @@ const StudentForm = ({ togglePopup }) => {
             );
             console.log("Submission success:", response.data);
             setIsLoading(false);
-            document.querySelector(
-              ".form-popup-inner"
-            ).innerHTML = `<h5>${response.data.message}</h5>`;
+            if (onSuccess) {
+              onSuccess(response.data.message);
+            } else {
+              // fallback
+              document.querySelector(".form-popup-inner").innerHTML = `<h5>${response.data.message}</h5>`;
+            }
           } catch (err) {
             console.error("Submission failed:", err);
             setIsLoading(false);

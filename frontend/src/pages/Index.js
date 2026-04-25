@@ -10,3 +10,4 @@ export { default as StudentDashboard } from "./StudentDashboard";
 export { default as ForgotPassword } from "./ForgotPassword";
 export { default as AdminDashboard } from "./AdminDashboard";
 export { default as Profile } from "./Profile";
+export { default as AdminLogin } from "./AdminLogin";

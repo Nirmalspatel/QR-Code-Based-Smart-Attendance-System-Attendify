@@ -15,14 +15,21 @@ router.get("/student/:id/stats", JWT.verifyToken, AdminController.GetStudentStat
 router.get("/academic-structure", JWT.verifyToken, AdminController.GetAcademicStructure);
 router.post("/stream/create", JWT.verifyToken, AdminController.CreateStream);
 router.post("/stream/:streamId/course", JWT.verifyToken, AdminController.AddCourseToStream);
-router.post("/stream/:streamId/course/:courseId/division", JWT.verifyToken, AdminController.AddDivisionToCourse);
+router.post("/stream/:streamId/course/:courseId/semester", JWT.verifyToken, AdminController.AddSemesterToCourse);
+router.post("/stream/:streamId/course/:courseId/semester/:semesterId/division", JWT.verifyToken, AdminController.AddDivisionToSemester);
 router.delete("/stream/:streamId", JWT.verifyToken, AdminController.DeleteStream);
 router.delete("/stream/:streamId/course/:courseId", JWT.verifyToken, AdminController.DeleteCourse);
-router.delete("/stream/:streamId/course/:courseId/division/:divisionId", JWT.verifyToken, AdminController.DeleteDivision);
+router.delete("/stream/:streamId/course/:courseId/semester/:semesterId", JWT.verifyToken, AdminController.DeleteSemester);
+router.delete("/stream/:streamId/course/:courseId/semester/:semesterId/division/:divisionId", JWT.verifyToken, AdminController.DeleteDivision);
 
 // ── Teacher Access Management ───────────────────────────────
 router.get("/teacher/:teacherId/access", JWT.verifyToken, AdminController.GetTeacherAccess);
 router.post("/teacher/:teacherId/access", JWT.verifyToken, AdminController.GrantTeacherAccess);
 router.delete("/teacher/:teacherId/access", JWT.verifyToken, AdminController.RevokeTeacherAccess);
+
+// ── Domain Settings ──────────────────────────────────────────
+router.get("/domain-settings", JWT.verifyToken, AdminController.GetDomainSettings);
+router.post("/domain-settings", JWT.verifyToken, AdminController.AddAllowedDomain);
+router.delete("/domain-settings/:domain", JWT.verifyToken, AdminController.RemoveAllowedDomain);
 
 export default router;

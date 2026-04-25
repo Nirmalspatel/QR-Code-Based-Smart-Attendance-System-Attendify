@@ -5,10 +5,13 @@ import "../styles/StreamManager.css";
 const StreamManager = ({ structure, onRefresh, token }) => {
   const [expandedStreams, setExpandedStreams] = useState({});
   const [expandedCourses, setExpandedCourses] = useState({});
+  const [expandedSemesters, setExpandedSemesters] = useState({});
   const [newStreamName, setNewStreamName] = useState("");
   const [newCourseName, setNewCourseName] = useState({});
+  const [newSemesterName, setNewSemesterName] = useState({});
   const [newDivisionName, setNewDivisionName] = useState({});
   const [addingCourse, setAddingCourse] = useState({});
+  const [addingSemester, setAddingSemester] = useState({});
   const [addingDivision, setAddingDivision] = useState({});
   const [loadingAction, setLoadingAction] = useState("");
 
@@ -18,6 +21,8 @@ const StreamManager = ({ structure, onRefresh, token }) => {
     setExpandedStreams((prev) => ({ ...prev, [id]: !prev[id] }));
   const toggleCourse = (id) =>
     setExpandedCourses((prev) => ({ ...prev, [id]: !prev[id] }));
+  const toggleSemester = (id) =>
+    setExpandedSemesters((prev) => ({ ...prev, [id]: !prev[id] }));
 
   // ── Stream CRUD ───────────────────────────────────────────
   const handleCreateStream = async () => {
@@ -77,14 +82,45 @@ const StreamManager = ({ structure, onRefresh, token }) => {
     }
   };
 
-  // ── Division CRUD ─────────────────────────────────────────
-  const handleCreateDivision = async (streamId, courseId) => {
+  // ── Semester CRUD ─────────────────────────────────────────
+  const handleCreateSemester = async (streamId, courseId) => {
     const key = `${streamId}-${courseId}`;
+    const name = (newSemesterName[key] || "").trim();
+    if (!name) return;
+    setLoadingAction(`sem-create-${key}`);
+    try {
+      await axios.post(`/admin/stream/${streamId}/course/${courseId}/semester`, { name }, cfg);
+      setNewSemesterName((prev) => ({ ...prev, [key]: "" }));
+      setAddingSemester((prev) => ({ ...prev, [key]: false }));
+      onRefresh();
+    } catch (err) {
+      alert(err.response?.data?.message || "Error creating semester");
+    } finally {
+      setLoadingAction("");
+    }
+  };
+
+  const handleDeleteSemester = async (streamId, courseId, semesterId, semName) => {
+    if (!window.confirm(`Delete semester "${semName}" and all its divisions?`)) return;
+    setLoadingAction(`sem-del-${semesterId}`);
+    try {
+      await axios.delete(`/admin/stream/${streamId}/course/${courseId}/semester/${semesterId}`, cfg);
+      onRefresh();
+    } catch (err) {
+      alert(err.response?.data?.message || "Error deleting semester");
+    } finally {
+      setLoadingAction("");
+    }
+  };
+
+  // ── Division CRUD ─────────────────────────────────────────
+  const handleCreateDivision = async (streamId, courseId, semesterId) => {
+    const key = `${streamId}-${courseId}-${semesterId}`;
     const name = (newDivisionName[key] || "").trim();
     if (!name) return;
     setLoadingAction(`div-create-${key}`);
     try {
-      await axios.post(`/admin/stream/${streamId}/course/${courseId}/division`, { name }, cfg);
+      await axios.post(`/admin/stream/${streamId}/course/${courseId}/semester/${semesterId}/division`, { name }, cfg);
       setNewDivisionName((prev) => ({ ...prev, [key]: "" }));
       setAddingDivision((prev) => ({ ...prev, [key]: false }));
       onRefresh();
@@ -95,11 +131,11 @@ const StreamManager = ({ structure, onRefresh, token }) => {
     }
   };
 
-  const handleDeleteDivision = async (streamId, courseId, divisionId, divName) => {
+  const handleDeleteDivision = async (streamId, courseId, semesterId, divisionId, divName) => {
     if (!window.confirm(`Delete division "${divName}"?`)) return;
     setLoadingAction(`div-del-${divisionId}`);
     try {
-      await axios.delete(`/admin/stream/${streamId}/course/${courseId}/division/${divisionId}`, cfg);
+      await axios.delete(`/admin/stream/${streamId}/course/${courseId}/semester/${semesterId}/division/${divisionId}`, cfg);
       onRefresh();
     } catch (err) {
       alert(err.response?.data?.message || "Error deleting division");
@@ -112,177 +148,176 @@ const StreamManager = ({ structure, onRefresh, token }) => {
 
   return (
     <div className="stream-manager">
-      {/* ── Create Stream ── */}
-      <div className="sm-create-bar">
-        <input
-          type="text"
-          placeholder="New stream name (e.g. B.Tech)"
-          value={newStreamName}
-          onChange={(e) => setNewStreamName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleCreateStream()}
-          className="sm-input"
-        />
-        <button
-          onClick={handleCreateStream}
-          disabled={loadingAction === "stream-create"}
-          className="sm-btn sm-btn-primary"
-        >
-          {loadingAction === "stream-create" ? "Adding..." : "+ Add Stream"}
-        </button>
+      {/* ── Header Area ── */}
+      <div className="sm-header-section">
+        <div className="sm-header-info">
+          <h2>Academic Ecosystem</h2>
+          <p>Define the streams, courses, and divisions for your organization.</p>
+        </div>
+        <div className="sm-create-bar">
+          <input
+            type="text"
+            placeholder="New stream name..."
+            value={newStreamName}
+            onChange={(e) => setNewStreamName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreateStream()}
+            className="sm-input"
+          />
+          <button
+            onClick={handleCreateStream}
+            disabled={loadingAction === "stream-create"}
+            className="sm-btn sm-btn-primary"
+          >
+            {loadingAction === "stream-create" ? "Adding..." : "+ Add Stream"}
+          </button>
+        </div>
       </div>
 
       {streams.length === 0 && (
-        <div className="sm-empty">No streams yet. Create one above to get started.</div>
+        <div className="sm-empty">
+          <span className="empty-icon">🏛️</span>
+          <p>No streams available. Start by creating your first stream above.</p>
+        </div>
       )}
 
       {/* ── Streams List ── */}
       {streams.map((stream) => (
         <div key={stream._id} className="sm-stream-card">
           <div className="sm-stream-header" onClick={() => toggleStream(stream._id)}>
-            <div className="sm-stream-title">
-              <span className={`sm-chevron ${expandedStreams[stream._id] ? "open" : ""}`}>▶</span>
-              <span className="sm-stream-name">{stream.name}</span>
-              <span className="sm-badge">{stream.courses.length} course{stream.courses.length !== 1 ? "s" : ""}</span>
+            <div className="sm-main-title">
+              <div className="sm-icon-box">🏛️</div>
+              <div className="sm-title-text">
+                <span className="sm-stream-name">{stream.name}</span>
+                <span className="sm-stream-meta">{stream.courses.length} Course{stream.courses.length !== 1 ? 's' : ''} established</span>
+              </div>
             </div>
-            <button
-              className="sm-delete-btn"
-              onClick={(e) => { e.stopPropagation(); handleDeleteStream(stream._id, stream.name); }}
-              disabled={loadingAction === `stream-del-${stream._id}`}
-              title="Delete stream"
-            >
-              🗑
-            </button>
+            
+            <div className="sm-stream-actions">
+              <button
+                className="sm-delete-btn"
+                onClick={(e) => { e.stopPropagation(); handleDeleteStream(stream._id, stream.name); }}
+                disabled={loadingAction === `stream-del-${stream._id}`}
+              >
+                {loadingAction === `stream-del-${stream._id}` ? "..." : "🗑 Delete"}
+              </button>
+              <div className={`sm-chevron ${expandedStreams[stream._id] ? "open" : ""}`}>
+                ▼
+              </div>
+            </div>
           </div>
 
           {expandedStreams[stream._id] && (
             <div className="sm-stream-body">
-              {/* Add course row */}
-              {addingCourse[stream._id] ? (
-                <div className="sm-inline-add">
-                  <input
-                    type="text"
-                    placeholder="Course name (e.g. Computer Science)"
-                    value={newCourseName[stream._id] || ""}
-                    onChange={(e) =>
-                      setNewCourseName((prev) => ({ ...prev, [stream._id]: e.target.value }))
-                    }
-                    onKeyDown={(e) => e.key === "Enter" && handleCreateCourse(stream._id)}
-                    className="sm-input sm-input-sm"
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => handleCreateCourse(stream._id)}
-                    disabled={loadingAction === `course-create-${stream._id}`}
-                    className="sm-btn sm-btn-success"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => setAddingCourse((prev) => ({ ...prev, [stream._id]: false }))}
-                    className="sm-btn sm-btn-ghost"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <button
-                  className="sm-add-link"
-                  onClick={() => setAddingCourse((prev) => ({ ...prev, [stream._id]: true }))}
-                >
-                  + Add Course
-                </button>
-              )}
-
-              {stream.courses.length === 0 && (
-                <div className="sm-empty-small">No courses yet.</div>
-              )}
-
-              {/* Courses */}
-              {stream.courses.map((course) => {
-                const divKey = `${stream._id}-${course._id}`;
-                return (
-                  <div key={course._id} className="sm-course-card">
-                    <div
-                      className="sm-course-header"
-                      onClick={() => toggleCourse(course._id)}
-                    >
-                      <div className="sm-course-title">
-                        <span className={`sm-chevron sm-chevron-sm ${expandedCourses[course._id] ? "open" : ""}`}>▶</span>
-                        <span className="sm-course-name">{course.name}</span>
-                        <span className="sm-division-chips">
-                          {course.divisions.map((d) => (
-                            <span key={d._id} className="sm-div-chip">{d.name}</span>
-                          ))}
-                        </span>
+              <div className="sm-section-title">Courses in {stream.name}</div>
+              
+              <div className="sm-nested-grid">
+                {stream.courses.map((course) => {
+                  const divKey = `${stream._id}-${course._id}`;
+                  return (
+                    <div key={course._id} className="sm-nested-card">
+                      <div className="sm-nested-header">
+                        <div className="sm-nested-info">
+                          <h4>{course.name}</h4>
+                          <span>{(course.semesters || []).length} Semesters</span>
+                        </div>
+                        <button
+                          className="sm-mini-del"
+                          onClick={() => handleDeleteCourse(stream._id, course._id, course.name)}
+                          title="Delete Course"
+                        >
+                          🗑
+                        </button>
                       </div>
-                      <button
-                        className="sm-delete-btn"
-                        onClick={(e) => { e.stopPropagation(); handleDeleteCourse(stream._id, course._id, course.name); }}
-                        disabled={loadingAction === `course-del-${course._id}`}
-                        title="Delete course"
-                      >
-                        🗑
-                      </button>
-                    </div>
 
-                    {expandedCourses[course._id] && (
-                      <div className="sm-course-body">
-                        <div className="sm-divisions-row">
-                          {course.divisions.map((div) => (
-                            <div key={div._id} className="sm-div-item">
-                              <span>{div.name}</span>
-                              <button
-                                className="sm-div-delete"
-                                onClick={() => handleDeleteDivision(stream._id, course._id, div._id, div.name)}
-                                disabled={loadingAction === `div-del-${div._id}`}
-                                title="Remove division"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
+                        <div className="sm-nested-body">
+                          {/* Semesters / Divisions */}
+                          {(course.semesters || []).map(sem => {
+                            const semKey = `${stream._id}-${course._id}-${sem._id}`;
+                            return (
+                              <div key={sem._id} className="sm-sem-wrapper">
+                                <div className="sm-sem-row">
+                                  <div className="sm-sem-name">
+                                    <span className="sm-sem-icon">📅</span>
+                                    <strong>{sem.name}</strong>
+                                  </div>
+                                  <button 
+                                    className="sm-mini-del" 
+                                    onClick={() => handleDeleteSemester(stream._id, course._id, sem._id, sem.name)}
+                                    title="Delete Semester"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                                <div className="sm-divisions-row">
+                                  {sem.divisions?.map(div => (
+                                    <div key={div._id} className="sm-div-item">
+                                      {div.name}
+                                      <span className="sm-div-delete" onClick={() => handleDeleteDivision(stream._id, course._id, sem._id, div._id, div.name)}>×</span>
+                                    </div>
+                                  ))}
+                                  
+                                  {addingDivision[semKey] ? (
+                                    <div className="sm-inline-add-xs">
+                                      <input
+                                        className="sm-input-xs"
+                                        placeholder="Div..."
+                                        value={newDivisionName[semKey] || ""}
+                                        onChange={(e) => setNewDivisionName(p => ({...p, [semKey]: e.target.value}))}
+                                        onKeyDown={(e) => e.key === "Enter" && handleCreateDivision(stream._id, course._id, sem._id)}
+                                        autoFocus
+                                      />
+                                      <button className="sm-check-btn" onClick={() => handleCreateDivision(stream._id, course._id, sem._id)}>✓</button>
+                                      <button className="sm-close-btn" onClick={() => setAddingDivision(p => ({...p, [semKey]: false}))}>×</button>
+                                    </div>
+                                  ) : (
+                                    <button className="sm-add-div-btn" onClick={() => setAddingDivision(p => ({...p, [semKey]: true}))}>+ Div</button>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
 
-                        {addingDivision[divKey] ? (
-                          <div className="sm-inline-add">
-                            <input
-                              type="text"
-                              placeholder="Division (e.g. A)"
-                              value={newDivisionName[divKey] || ""}
-                              onChange={(e) =>
-                                setNewDivisionName((prev) => ({ ...prev, [divKey]: e.target.value }))
-                              }
-                              onKeyDown={(e) => e.key === "Enter" && handleCreateDivision(stream._id, course._id)}
-                              className="sm-input sm-input-xs"
-                              autoFocus
-                            />
-                            <button
-                              onClick={() => handleCreateDivision(stream._id, course._id)}
-                              disabled={loadingAction === `div-create-${divKey}`}
-                              className="sm-btn sm-btn-success"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={() => setAddingDivision((prev) => ({ ...prev, [divKey]: false }))}
-                              className="sm-btn sm-btn-ghost"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            className="sm-add-link"
-                            onClick={() => setAddingDivision((prev) => ({ ...prev, [divKey]: true }))}
-                          >
-                            + Add Division
-                          </button>
-                        )}
-                      </div>
-                    )}
+                      {addingSemester[divKey] ? (
+                        <div className="sm-inline-add">
+                          <input
+                            className="sm-input-sm"
+                            placeholder="New semester name..."
+                            value={newSemesterName[divKey] || ""}
+                            onChange={(e) => setNewSemesterName(p => ({...p, [divKey]: e.target.value}))}
+                            onKeyDown={(e) => e.key === "Enter" && handleCreateSemester(stream._id, course._id)}
+                            autoFocus
+                          />
+                          <button className="sm-btn sm-btn-success" onClick={() => handleCreateSemester(stream._id, course._id)}>Add</button>
+                        </div>
+                      ) : (
+                        <button className="sm-btn sm-btn-ghost" style={{width:'100%', justifyContent:'center'}} onClick={() => setAddingSemester(p => ({...p, [divKey]: true}))}>+ Add Semester</button>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {addingCourse[stream._id] ? (
+                  <div className="sm-nested-card sm-inline-add" style={{display:'flex', flexDirection:'column'}}>
+                    <input
+                      className="sm-input-sm"
+                      placeholder="New course name..."
+                      value={newCourseName[stream._id] || ""}
+                      onChange={(e) => setNewCourseName(p => ({...p, [stream._id]: e.target.value}))}
+                      onKeyDown={(e) => e.key === "Enter" && handleCreateCourse(stream._id)}
+                      autoFocus
+                    />
+                    <div style={{display:'flex', gap:'8px', marginTop:'8px'}}>
+                      <button className="sm-btn sm-btn-success" onClick={() => handleCreateCourse(stream._id)}>Save Course</button>
+                      <button className="sm-btn sm-btn-ghost" onClick={() => setAddingCourse(p => ({...p, [stream._id]: false}))}>Cancel</button>
+                    </div>
                   </div>
-                );
-              })}
+                ) : (
+                  <button className="sm-add-link" onClick={() => setAddingCourse(p => ({...p, [stream._id]: true}))}>
+                    <span>+ Establish New Course</span>
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>

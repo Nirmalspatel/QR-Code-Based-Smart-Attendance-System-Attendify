@@ -15,8 +15,14 @@ import userRoutes from "./routes/userRoutes.js";
 import SessionRoutes from "./routes/SessionRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 
+import { createServer } from "http";
+import { init as initSocket } from "./socket.js";
+
 // Initialize the app
 const app = express();
+const httpServer = createServer(app);
+const io = initSocket(httpServer);
+
 const PORT = process.env.PORT || 5051;
 const MONGODB_URI =
   process.env.MONGODB || "mongodb://127.0.0.1:27017/atendo";
@@ -43,13 +49,26 @@ mongoose
   })
   .catch((err) => console.log(err));
 
+// Make io available to requests via app.set (optional, but we use getIO helper)
+app.set("io", io);
+
 // Routes
 app.use("/users", userRoutes);
 app.use("/sessions", SessionRoutes);
 app.use("/admin", adminRoutes);
 
+// Serve static files in production
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static(path.join(__dirname, "../frontend/build")));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(__dirname, "../frontend/build", "index.html"));
+  });
+}
+
 // Start the server
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`[DEBUG] Backend Client URL: ${process.env.CLIENT_URL}`);
+  console.log(`[DEBUG] Socket.io initialized`);
 });
+

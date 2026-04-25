@@ -11,6 +11,7 @@ import {
   ForgotPassword,
   AdminDashboard,
   Profile,
+  AdminLogin,
 } from "./pages/Index";
 
 const router = createBrowserRouter([
@@ -57,6 +58,10 @@ const router = createBrowserRouter([
       {
         path: "profile",
         element: <Profile />,
+      },
+      {
+        path: "admin-login",
+        element: <AdminLogin />,
       },
       {
         path: "*",

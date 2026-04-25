@@ -3,6 +3,7 @@ import { Teacher } from "../model/Teacher.js";
 import { Student } from "../model/Student.js";
 import uploadImage from "../middleware/Cloudinary.js";
 import { AcademicStructure } from "../model/AcademicStructure.js";
+import { getIO } from "../socket.js";
 
 function getQR(session_id, email, name, date, location) {
   // Debug log to verify environmental sync
@@ -51,10 +52,82 @@ function checkStudentDistance(Location1, Location2) {
 
 //make controller functions
 
+async function CreateSubject(req, res) {
+  try {
+    const { name, code } = req.body;
+    const tokenData = req.user;
+    
+    if (!tokenData || !tokenData.email) {
+      return res.status(401).json({ message: "Invalid token data. Please log in again." });
+    }
+
+    const teacher = await Teacher.findOneAndUpdate(
+      { email: tokenData.email },
+      { $push: { subjects: { name, code, sessions: [] } } },
+      { new: true }
+    );
+
+    if (!teacher) {
+      return res.status(404).json({ message: "Teacher account not found." });
+    }
+
+    res.status(200).json({ 
+      message: "Subject created successfully", 
+      subjects: teacher.subjects 
+    });
+  } catch (err) {
+    console.error("Error creating subject:", err);
+    res.status(400).json({ message: err.message });
+  }
+}
+
+async function GetSubjects(req, res) {
+  try {
+    const tokenData = req.user;
+    if (!tokenData || !tokenData.email) {
+      return res.status(401).json({ message: "Invalid token. Please log in again." });
+    }
+
+    const teacher = await Teacher.findOne({ email: tokenData.email });
+    if (!teacher) {
+      return res.status(404).json({ message: "Teacher not found." });
+    }
+    
+    // Auto-migration for legacy sessions
+    if (teacher.sessions && teacher.sessions.length > 0 && (!teacher.subjects || teacher.subjects.length === 0)) {
+      teacher.subjects.push({
+        name: "General",
+        code: "GEN",
+        sessions: teacher.sessions
+      });
+      teacher.sessions = [];
+      await teacher.save();
+    }
+
+    res.status(200).json({ subjects: teacher.subjects });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+}
+
+async function DeleteSubject(req, res) {
+  try {
+    const { subject_id } = req.body;
+    const tokenData = req.user;
+    await Teacher.findOneAndUpdate(
+      { email: tokenData.email },
+      { $pull: { subjects: { _id: subject_id } } }
+    );
+    res.status(200).json({ message: "Subject deleted successfully" });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+}
+
 async function CreateNewSession(req, res) {
   let {
-    session_id, name, duration, location, radius, date, time, token,
-    streamId, streamName, courseId, courseName, divisions,
+    subject_id, session_id, name, duration, location, radius, date, time, 
+    streamId, streamName, courseId, courseName, semesterId, semesterName, divisions,
   } = req.body;
   let tokenData = req.user;
 
@@ -70,14 +143,53 @@ async function CreateNewSession(req, res) {
     streamName: streamName || "",
     courseId: courseId || null,
     courseName: courseName || "",
+    semesterId: semesterId || null,
+    semesterName: semesterName || "",
     divisions: Array.isArray(divisions) ? divisions : (divisions ? [divisions] : []),
   };
 
   try {
-    let teacher = await Teacher.findOneAndUpdate(
-      { email: tokenData.email },
-      { $push: { sessions: newSession } }
+    const teacher = await Teacher.findOne({ email: tokenData.email });
+    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+
+    let targetSubject;
+    if (subject_id) {
+      targetSubject = teacher.subjects.id(subject_id);
+    } else {
+      targetSubject = teacher.subjects.find(s => s.name === "General");
+      if (!targetSubject) {
+        teacher.subjects.push({ name: "General", sessions: [] });
+        await teacher.save();
+        targetSubject = teacher.subjects[teacher.subjects.length - 1];
+      }
+    }
+
+    if (!targetSubject) return res.status(404).json({ message: "Subject not found" });
+
+    // Use atomic update to ensure persistency and avoid race conditions or subdoc tracking issues
+    const updateResult = await Teacher.findOneAndUpdate(
+      { _id: teacher._id, "subjects._id": targetSubject._id },
+      { $push: { "subjects.$.sessions": newSession } },
+      { new: true }
     );
+
+    if (!updateResult) {
+       console.error(`[SESSION ERROR] Failed to perform atomic push for teacher ${teacher.email}`);
+       return res.status(500).json({ message: "Failed to save session to database" });
+    }
+
+    console.log(`[SESSION SUCCESS] Created session "${name}" for teacher ${teacher.email} in subject "${targetSubject.name}"`);
+
+    // Emit real-time event
+    try {
+      getIO().emit("session-created", {
+        teacher: teacher.email,
+        session_name: name,
+        date
+      });
+    } catch (socketErr) {
+      console.error("[SOCKET ERROR] Failed to emit session-created event:", socketErr.message);
+    }
 
     res.status(200).json({
       url: getQR(session_id, teacher.email, name, date, location),
@@ -92,7 +204,19 @@ async function GetAllTeacherSessions(req, res) {
   try {
     let tokenData = req.user;
     const teacher = await Teacher.findOne({ email: tokenData.email });
-    res.status(200).json({ sessions: teacher.sessions });
+    
+    // Auto-migration for legacy sessions on main dashboard load
+    if (teacher.sessions && teacher.sessions.length > 0 && (!teacher.subjects || teacher.subjects.length === 0)) {
+      teacher.subjects.push({
+        name: "General",
+        code: "GEN",
+        sessions: teacher.sessions
+      });
+      teacher.sessions = [];
+      await teacher.save();
+    }
+
+    res.status(200).json({ subjects: teacher.subjects });
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
@@ -109,7 +233,22 @@ async function GetQR(req, res) {
       return res.status(404).json({ message: "Teacher not found" });
     }
 
-    const session = teacher.sessions.find(s => s.session_id === session_id);
+    // Search through all subjects for the session
+    let session = null;
+    let foundSubject = null;
+    for (const subj of teacher.subjects) {
+      session = subj.sessions.find(s => s.session_id === session_id);
+      if (session) {
+        foundSubject = subj;
+        break;
+      }
+    }
+
+    // Check legacy sessions too
+    if (!session) {
+      session = teacher.sessions.find(s => s.session_id === session_id);
+    }
+
     if (!session) {
       return res.status(404).json({ message: "Session not found" });
     }
@@ -143,12 +282,24 @@ async function AttendSession(req, res) {
       return res.status(404).json({ message: "Teacher not found" });
     }
 
-    const sessionIndex = teacher.sessions.findIndex(s => s.session_id === session_id);
-    if (sessionIndex === -1) {
-      return res.status(404).json({ message: "Session not found" });
+    let session = null;
+    let foundSubject = null;
+    for (const subj of teacher.subjects) {
+      session = subj.sessions.find(s => s.session_id === session_id);
+      if (session) {
+        foundSubject = subj;
+        break;
+      }
     }
 
-    const session = teacher.sessions[sessionIndex];
+    // Check legacy sessions
+    if (!session) {
+      session = teacher.sessions.find(s => s.session_id === session_id);
+    }
+
+    if (!session) {
+      return res.status(404).json({ message: "Session not found" });
+    }
 
     // Check if QR is expired
     if (session.isExpired) {
@@ -156,8 +307,30 @@ async function AttendSession(req, res) {
     }
 
     const studentInfo = await Student.findOne({ email: tokenData.email });
-    const student_name = studentInfo ? studentInfo.name : "Unknown";
-    const regno = studentInfo && studentInfo.regno ? studentInfo.regno : "Not Provided";
+    if (!studentInfo) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    // Check if the student belongs to the required stream/course/semester/division for this session
+    if (session.streamId || session.courseId || session.semesterId || (session.divisions && session.divisions.length > 0)) {
+      if (session.streamId && String(session.streamId) !== String(studentInfo.streamId || "")) {
+        return res.status(403).json({ message: "Access denied. You do not belong to the stream for this session." });
+      }
+      if (session.courseId && String(session.courseId) !== String(studentInfo.courseId || "")) {
+        return res.status(403).json({ message: "Access denied. You do not belong to the course for this session." });
+      }
+      if (session.semesterId && String(session.semesterId) !== String(studentInfo.semesterId || "")) {
+        return res.status(403).json({ message: "Access denied. You do not belong to the semester for this session." });
+      }
+      if (session.divisions && session.divisions.length > 0) {
+        if (!studentInfo.division || !session.divisions.includes(studentInfo.division)) {
+          return res.status(403).json({ message: `Access denied. This session is restricted to division(s): ${session.divisions.join(", ")}. Your division: ${studentInfo.division || "Not Set"}` });
+        }
+      }
+    }
+
+    const student_name = studentInfo.name || "Unknown";
+    const regno = studentInfo.regno || "Not Provided";
 
     // Check if already marked
     const alreadyMarked = session.attendance.some(a => a.regno === regno || a.student_email === student_email);
@@ -192,6 +365,7 @@ async function AttendSession(req, res) {
 
     const session_details = {
       session_id: session.session_id,
+      subjectName: foundSubject ? foundSubject.name : "General",
       teacher_email: teacher.email,
       name: session.name,
       date: currentTimestamp,
@@ -204,14 +378,46 @@ async function AttendSession(req, res) {
     };
 
     // Update Teacher Sessions (Attendance)
-    teacher.sessions[sessionIndex].attendance.push(attendanceEntry);
+    // We need to find the session again to update it within the array correctly
+    let updated = false;
+    for (const subj of teacher.subjects) {
+      const sIndex = subj.sessions.findIndex(s => s.session_id === session_id);
+      if (sIndex !== -1) {
+        subj.sessions[sIndex].attendance.push(attendanceEntry);
+        updated = true;
+        break;
+      }
+    }
+    
+    if (!updated) {
+       const sIndex = teacher.sessions.findIndex(s => s.session_id === session_id);
+       if (sIndex !== -1) {
+         teacher.sessions[sIndex].attendance.push(attendanceEntry);
+       }
+    }
+
     await teacher.save();
 
-    // Update Student Sessions
     await Student.findOneAndUpdate(
       { email: student_email },
       { $push: { sessions: session_details } }
     );
+
+    // Emit real-time event
+    try {
+      const io = getIO();
+      // Notify the teacher's specific room
+      io.to(teacher.email).emit("attendance-marked", {
+        session_id,
+        student_name,
+        regno,
+        date: currentTimestamp
+      });
+      // Also notify admins
+      io.emit("admin-activity", { type: "attendance", teacher: teacher.email, session: session.name });
+    } catch (socketErr) {
+      console.error("[SOCKET ERROR] Failed to emit attendance event:", socketErr.message);
+    }
 
     res.status(200).json({ message: "Attendance marked successfully" });
   } catch (err) {
@@ -244,12 +450,24 @@ async function ExpireSession(req, res) {
       return res.status(404).json({ message: "Teacher not found" });
     }
 
-    const sessionIndex = teacher.sessions.findIndex(s => s.session_id === session_id);
-    if (sessionIndex === -1) {
-      return res.status(404).json({ message: "Session not found" });
+    let updated = false;
+    for (const subj of teacher.subjects) {
+      const sIndex = subj.sessions.findIndex(s => s.session_id === session_id);
+      if (sIndex !== -1) {
+        subj.sessions[sIndex].isExpired = true;
+        updated = true;
+        break;
+      }
     }
 
-    teacher.sessions[sessionIndex].isExpired = true;
+    if (!updated) {
+      const sIndex = teacher.sessions.findIndex(s => s.session_id === session_id);
+      if (sIndex !== -1) {
+        teacher.sessions[sIndex].isExpired = true;
+        updated = true;
+      }
+    }
+
     await teacher.save();
 
     res.status(200).json({ message: "Session attendance closed successfully" });
@@ -269,12 +487,24 @@ async function ReopenSession(req, res) {
       return res.status(404).json({ message: "Teacher not found" });
     }
 
-    const sessionIndex = teacher.sessions.findIndex(s => s.session_id === session_id);
-    if (sessionIndex === -1) {
-      return res.status(404).json({ message: "Session not found" });
+    let updated = false;
+    for (const subj of teacher.subjects) {
+      const sIndex = subj.sessions.findIndex(s => s.session_id === session_id);
+      if (sIndex !== -1) {
+        subj.sessions[sIndex].isExpired = false;
+        updated = true;
+        break;
+      }
     }
 
-    teacher.sessions[sessionIndex].isExpired = false;
+    if (!updated) {
+      const sIndex = teacher.sessions.findIndex(s => s.session_id === session_id);
+      if (sIndex !== -1) {
+        teacher.sessions[sIndex].isExpired = false;
+        updated = true;
+      }
+    }
+
     await teacher.save();
 
     res.status(200).json({ message: "Session attendance re-opened successfully" });
@@ -307,13 +537,22 @@ async function GetSessionRoster(req, res) {
     const teacher = await Teacher.findOne({ email: tokenData.email });
     if (!teacher) return res.status(404).json({ message: "Teacher not found" });
 
-    const session = teacher.sessions.find((s) => s.session_id === session_id);
+    let session = null;
+    for (const subj of teacher.subjects) {
+       session = subj.sessions.find((s) => s.session_id === session_id);
+       if (session) break;
+    }
+    
+    if (!session) {
+      session = teacher.sessions.find((s) => s.session_id === session_id);
+    }
+
     if (!session) return res.status(404).json({ message: "Session not found" });
 
-    const { streamId, courseId, divisions } = session;
+    const { streamId, courseId, semesterId, divisions } = session;
 
     // If session has no academic context attached, return only attendance list
-    if (!streamId || !courseId || !divisions || divisions.length === 0) {
+    if (!streamId || !courseId || !semesterId || !divisions || divisions.length === 0) {
       return res.status(200).json({
         roster: session.attendance.map((a) => ({
           regno: a.regno,
@@ -326,11 +565,12 @@ async function GetSessionRoster(req, res) {
       });
     }
 
-    // Fetch all students belonging to this stream+course+divisions
+    // Fetch all students belonging to this stream+course+semester+divisions
     const allStudents = await Student.find(
       {
         streamId: streamId,
         courseId: courseId,
+        semesterId: semesterId,
         division: { $in: divisions },
       },
       { password: 0 }
@@ -383,6 +623,9 @@ async function GetSessionRoster(req, res) {
 }
 
 const SessionController = {
+  CreateSubject,
+  GetSubjects,
+  DeleteSubject,
   CreateNewSession,
   GetAllTeacherSessions,
   GetQR,
@@ -403,14 +646,35 @@ async function DeleteSession(req, res) {
     let tokenData = req.user;
     const { session_id } = req.body;
 
-    const teacher = await Teacher.findOneAndUpdate(
-      { email: tokenData.email },
-      { $pull: { sessions: { session_id } } },
-      { new: true }
-    );
+    const teacher = await Teacher.findOne({ email: tokenData.email });
+    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
 
-    if (!teacher) {
-      return res.status(404).json({ message: "Teacher not found" });
+    // Try deleting from subjects
+    let deleted = false;
+    for (const subj of teacher.subjects) {
+      const initialLen = subj.sessions.length;
+      subj.sessions = subj.sessions.filter(s => s.session_id !== session_id);
+      if (subj.sessions.length < initialLen) {
+        deleted = true;
+        break;
+      }
+    }
+
+    // Try deleting from legacy sessions
+    if (!deleted) {
+      teacher.sessions = teacher.sessions.filter(s => s.session_id !== session_id);
+    }
+
+    await teacher.save();
+
+    // Cascading delete: Remove session from all students' dashboards
+    try {
+      await Student.updateMany(
+        { "sessions.session_id": session_id },
+        { $pull: { sessions: { session_id: session_id } } }
+      );
+    } catch (cascadeErr) {
+      console.error("[CASCADE DELETE ERROR] Failed to remove session from students:", cascadeErr.message);
     }
 
     res.status(200).json({ message: "Session deleted successfully" });

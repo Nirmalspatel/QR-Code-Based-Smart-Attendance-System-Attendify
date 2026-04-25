@@ -1,6 +1,7 @@
 import { Student } from "../model/Student.js";
 import { Teacher } from "../model/Teacher.js";
 import { AcademicStructure } from "../model/AcademicStructure.js";
+import { SystemConfig } from "../model/SystemConfig.js";
 
 // ─────────────────────────────────────────────
 // Existing: Users & Sessions
@@ -19,10 +20,14 @@ async function GetAllTeachers(req, res) {
   try {
     const teachers = await Teacher.find({}, { password: 0 });
     const teachersWithCount = teachers.map((teacher) => {
+      let count = (teacher.sessions || []).length;
+      (teacher.subjects || []).forEach(subj => {
+        count += (subj.sessions || []).length;
+      });
       const obj = teacher.toObject();
       return {
         ...obj,
-        sessionCount: teacher.sessions.length,
+        sessionCount: count,
       };
     });
     res.status(200).json(teachersWithCount);
@@ -33,14 +38,27 @@ async function GetAllTeachers(req, res) {
 
 async function GetAllSessions(req, res) {
   try {
-    const teachers = await Teacher.find({}, { sessions: 1, name: 1, email: 1 });
+    const teachers = await Teacher.find({}, { subjects: 1, sessions: 1, name: 1, email: 1 });
     let sessions = [];
     teachers.forEach((teacher) => {
-      teacher.sessions.forEach((session) => {
+      // Legacy sessions
+      (teacher.sessions || []).forEach((session) => {
         sessions.push({
           ...session.toObject(),
           teacherName: teacher.name,
           teacherEmail: teacher.email,
+          subjectName: "General"
+        });
+      });
+      // Subject-based sessions
+      (teacher.subjects || []).forEach((subject) => {
+        (subject.sessions || []).forEach((session) => {
+          sessions.push({
+            ...session.toObject(),
+            teacherName: teacher.name,
+            teacherEmail: teacher.email,
+            subjectName: subject.name
+          });
         });
       });
     });
@@ -71,15 +89,40 @@ async function DeleteUser(req, res) {
 async function DeleteSession(req, res) {
   const { teacherEmail, sessionId } = req.params;
   try {
-    const teacher = await Teacher.findOneAndUpdate(
-      { email: teacherEmail },
-      { $pull: { sessions: { session_id: sessionId } } },
-      { new: true }
-    );
-    if (teacher) {
+    const teacher = await Teacher.findOne({ email: teacherEmail });
+    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+
+    let deleted = false;
+    // Try deleting from subjects
+    (teacher.subjects || []).forEach(subj => {
+      const initialLen = subj.sessions.length;
+      subj.sessions = subj.sessions.filter(s => s.session_id !== sessionId);
+      if (subj.sessions.length < initialLen) deleted = true;
+    });
+
+    // Try deleting from legacy
+    if (!deleted) {
+      const initialLen = teacher.sessions.length;
+      teacher.sessions = teacher.sessions.filter(s => s.session_id !== sessionId);
+      if (teacher.sessions.length < initialLen) deleted = true;
+    }
+
+    if (deleted) {
+      await teacher.save();
+
+      // Cascading delete: Remove session from all students' dashboards
+      try {
+        await Student.updateMany(
+          { "sessions.session_id": sessionId },
+          { $pull: { sessions: { session_id: sessionId } } }
+        );
+      } catch (cascadeErr) {
+        console.error("[CASCADE DELETE ERROR] Failed to remove session from students:", cascadeErr.message);
+      }
+
       res.status(200).json({ message: "Session deleted successfully" });
     } else {
-      res.status(404).json({ message: "Teacher not found" });
+      res.status(404).json({ message: "Session not found" });
     }
   } catch (error) {
     res.status(500).json({ message: "Error deleting session", error: error.message });
@@ -129,7 +172,7 @@ async function AddCourseToStream(req, res) {
     const root = await getRoot();
     const stream = root.streams.id(streamId);
     if (!stream) return res.status(404).json({ message: "Stream not found" });
-    stream.courses.push({ name, divisions: [] });
+    stream.courses.push({ name, semesters: [] });
     await root.save();
     res.status(201).json({ message: "Course added", structure: root });
   } catch (error) {
@@ -137,8 +180,26 @@ async function AddCourseToStream(req, res) {
   }
 }
 
-async function AddDivisionToCourse(req, res) {
+async function AddSemesterToCourse(req, res) {
   const { streamId, courseId } = req.params;
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ message: "Semester name is required" });
+  try {
+    const root = await getRoot();
+    const stream = root.streams.id(streamId);
+    if (!stream) return res.status(404).json({ message: "Stream not found" });
+    const course = stream.courses.id(courseId);
+    if (!course) return res.status(404).json({ message: "Course not found" });
+    course.semesters.push({ name, divisions: [] });
+    await root.save();
+    res.status(201).json({ message: "Semester added", structure: root });
+  } catch (error) {
+    res.status(500).json({ message: "Error adding semester", error: error.message });
+  }
+}
+
+async function AddDivisionToSemester(req, res) {
+  const { streamId, courseId, semesterId } = req.params;
   const { name } = req.body;
   if (!name) return res.status(400).json({ message: "Division name is required" });
   try {
@@ -147,10 +208,12 @@ async function AddDivisionToCourse(req, res) {
     if (!stream) return res.status(404).json({ message: "Stream not found" });
     const course = stream.courses.id(courseId);
     if (!course) return res.status(404).json({ message: "Course not found" });
+    const semester = course.semesters.id(semesterId);
+    if (!semester) return res.status(404).json({ message: "Semester not found" });
     // Prevent duplicate division names
-    const exists = course.divisions.some((d) => d.name.toLowerCase() === name.toLowerCase());
+    const exists = semester.divisions.some((d) => d.name.toLowerCase() === name.toLowerCase());
     if (exists) return res.status(400).json({ message: "Division already exists" });
-    course.divisions.push({ name });
+    semester.divisions.push({ name });
     await root.save();
     res.status(201).json({ message: "Division added", structure: root });
   } catch (error) {
@@ -162,7 +225,15 @@ async function DeleteStream(req, res) {
   const { streamId } = req.params;
   try {
     const root = await getRoot();
-    root.streams.pull({ _id: streamId });
+    const stream = root.streams.id(streamId);
+    if (!stream) return res.status(404).json({ message: "Stream not found" });
+    
+    // Clean up teachers' access just in case
+    await Teacher.updateMany({}, {
+      $pull: { allowedAccess: { streamId: streamId } }
+    });
+
+    stream.deleteOne();
     await root.save();
     res.status(200).json({ message: "Stream deleted", structure: root });
   } catch (error) {
@@ -176,7 +247,16 @@ async function DeleteCourse(req, res) {
     const root = await getRoot();
     const stream = root.streams.id(streamId);
     if (!stream) return res.status(404).json({ message: "Stream not found" });
-    stream.courses.pull({ _id: courseId });
+    
+    const course = stream.courses.id(courseId);
+    if (!course) return res.status(404).json({ message: "Course not found" });
+    
+    // Clean up teachers' access
+    await Teacher.updateMany({}, {
+      $pull: { allowedAccess: { courseId: courseId } }
+    });
+
+    course.deleteOne();
     await root.save();
     res.status(200).json({ message: "Course deleted", structure: root });
   } catch (error) {
@@ -184,15 +264,46 @@ async function DeleteCourse(req, res) {
   }
 }
 
-async function DeleteDivision(req, res) {
-  const { streamId, courseId, divisionId } = req.params;
+async function DeleteSemester(req, res) {
+  const { streamId, courseId, semesterId } = req.params;
   try {
     const root = await getRoot();
     const stream = root.streams.id(streamId);
     if (!stream) return res.status(404).json({ message: "Stream not found" });
     const course = stream.courses.id(courseId);
     if (!course) return res.status(404).json({ message: "Course not found" });
-    course.divisions.pull({ _id: divisionId });
+    
+    const semester = course.semesters.id(semesterId);
+    if (!semester) return res.status(404).json({ message: "Semester not found" });
+
+    // Clean up teachers' access
+    await Teacher.updateMany({}, {
+      $pull: { allowedAccess: { semesterId: semesterId } }
+    });
+
+    semester.deleteOne();
+    await root.save();
+    res.status(200).json({ message: "Semester deleted", structure: root });
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting semester", error: error.message });
+  }
+}
+
+async function DeleteDivision(req, res) {
+  const { streamId, courseId, semesterId, divisionId } = req.params;
+  try {
+    const root = await getRoot();
+    const stream = root.streams.id(streamId);
+    if (!stream) return res.status(404).json({ message: "Stream not found" });
+    const course = stream.courses.id(courseId);
+    if (!course) return res.status(404).json({ message: "Course not found" });
+    const semester = course.semesters.id(semesterId);
+    if (!semester) return res.status(404).json({ message: "Semester not found" });
+    
+    const division = semester.divisions.id(divisionId);
+    if (!division) return res.status(404).json({ message: "Division not found" });
+
+    division.deleteOne();
     await root.save();
     res.status(200).json({ message: "Division deleted", structure: root });
   } catch (error) {
@@ -221,7 +332,8 @@ async function GrantTeacherAccess(req, res) {
       const duplicate = teacher.allowedAccess.some(
         (a) =>
           a.streamId?.toString() === access.streamId?.toString() &&
-          a.courseId?.toString() === access.courseId?.toString()
+          a.courseId?.toString() === access.courseId?.toString() &&
+          a.semesterId?.toString() === access.semesterId?.toString()
       );
       if (!duplicate) {
         teacher.allowedAccess.push(access);
@@ -247,7 +359,8 @@ async function RevokeTeacherAccess(req, res) {
       (a) =>
         !(
           a.streamId?.toString() === streamId?.toString() &&
-          a.courseId?.toString() === courseId?.toString()
+          a.courseId?.toString() === courseId?.toString() &&
+          a.semesterId?.toString() === req.body.semesterId?.toString()
         )
     );
     await teacher.save();
@@ -275,18 +388,26 @@ async function GetStudentStats(req, res) {
     if (!student) return res.status(404).json({ message: "Student not found" });
 
     // Find all teachers
-    const teachers = await Teacher.find({}, { sessions: 1 });
+    const teachers = await Teacher.find({}, { subjects: 1, sessions: 1 });
     
     let totalSessionsCount = 0;
     let attendedSessionsCount = 0;
     let sessionHistory = [];
 
     teachers.forEach((teacher) => {
-      teacher.sessions.forEach((session) => {
+      // Collect all sessions (legacy + subject-based)
+      const allSessions = [];
+      (teacher.sessions || []).forEach(s => allSessions.push({ ...s.toObject(), subjectName: "General" }));
+      (teacher.subjects || []).forEach(subj => {
+        subj.sessions.forEach(s => allSessions.push({ ...s.toObject(), subjectName: subj.name }));
+      });
+
+      allSessions.forEach((session) => {
         // Check if this session applies to the student's academic group
         const applies = 
           session.streamId?.toString() === student.streamId?.toString() &&
           session.courseId?.toString() === student.courseId?.toString() &&
+          session.semesterId?.toString() === student.semesterId?.toString() &&
           (session.divisions || []).includes(student.division);
 
         if (applies) {
@@ -302,6 +423,7 @@ async function GetStudentStats(req, res) {
           sessionHistory.push({
             session_id: session.session_id,
             name: session.name,
+            subjectName: session.subjectName,
             date: session.date,
             attended: !!attendanceRecord,
           });
@@ -335,6 +457,60 @@ async function GetStudentStats(req, res) {
   }
 }
 
+// ─────────────────────────────────────────────
+// System Config: Allowed Email Domains
+// ─────────────────────────────────────────────
+
+async function getConfig() {
+  let cfg = await SystemConfig.findOne({ key: "global" });
+  if (!cfg) cfg = await SystemConfig.create({ key: "global", allowedDomains: [] });
+  return cfg;
+}
+
+async function GetDomainSettings(req, res) {
+  try {
+    const cfg = await getConfig();
+    res.status(200).json({ allowedDomains: cfg.allowedDomains });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching domain settings", error: error.message });
+  }
+}
+
+async function AddAllowedDomain(req, res) {
+  let { domain } = req.body;
+  if (!domain) return res.status(400).json({ message: "Domain is required" });
+  // Normalise: strip leading "@" and lowercase
+  domain = domain.replace(/^@/, "").toLowerCase().trim();
+  if (!domain.includes(".")) return res.status(400).json({ message: "Enter a valid domain (e.g. nirmauni.ac.in)" });
+  try {
+    const cfg = await getConfig();
+    if (cfg.allowedDomains.includes(domain)) {
+      return res.status(400).json({ message: "Domain already exists" });
+    }
+    cfg.allowedDomains.push(domain);
+    await cfg.save();
+    res.status(200).json({ message: "Domain added", allowedDomains: cfg.allowedDomains });
+  } catch (error) {
+    res.status(500).json({ message: "Error adding domain", error: error.message });
+  }
+}
+
+async function RemoveAllowedDomain(req, res) {
+  const { domain } = req.params;
+  try {
+    const cfg = await getConfig();
+    const before = cfg.allowedDomains.length;
+    cfg.allowedDomains = cfg.allowedDomains.filter((d) => d !== domain);
+    if (cfg.allowedDomains.length === before) {
+      return res.status(404).json({ message: "Domain not found" });
+    }
+    await cfg.save();
+    res.status(200).json({ message: "Domain removed", allowedDomains: cfg.allowedDomains });
+  } catch (error) {
+    res.status(500).json({ message: "Error removing domain", error: error.message });
+  }
+}
+
 const AdminController = {
   // Existing
   GetAllStudents,
@@ -346,15 +522,21 @@ const AdminController = {
   GetAcademicStructure,
   CreateStream,
   AddCourseToStream,
-  AddDivisionToCourse,
+  AddSemesterToCourse,
+  AddDivisionToSemester,
   DeleteStream,
   DeleteCourse,
+  DeleteSemester,
   DeleteDivision,
   // Teacher access
   GrantTeacherAccess,
   RevokeTeacherAccess,
   GetTeacherAccess,
   GetStudentStats,
+  // Domain settings
+  GetDomainSettings,
+  AddAllowedDomain,
+  RemoveAllowedDomain,
 };
 
 export default AdminController;

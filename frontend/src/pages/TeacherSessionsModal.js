@@ -19,7 +19,15 @@ const TeacherSessionsModal = ({ teacher, onClose, onDeleteSession }) => {
           <div className="tsm-stats-summary">
             <div className="tsm-stat">
               <span className="label">Total Sessions</span>
-              <span className="value">{teacher.sessions?.length || 0}</span>
+              <span className="value">
+                {(() => {
+                  let count = (teacher.sessions || []).length;
+                  (teacher.subjects || []).forEach(subj => {
+                    count += (subj.sessions || []).length;
+                  });
+                  return count;
+                })()}
+              </span>
             </div>
             <div className="tsm-stat">
               <span className="label">Access Level</span>
@@ -29,52 +37,64 @@ const TeacherSessionsModal = ({ teacher, onClose, onDeleteSession }) => {
 
           <div className="tsm-session-list">
             <h4>Generated Sessions</h4>
-            {(teacher.sessions || []).length === 0 ? (
-              <p className="tsm-empty">No sessions created yet.</p>
-            ) : (
-              <div className="tsm-table-wrapper">
-                <table className="tsm-table">
-                  <thead>
-                    <tr>
-                      <th>Session Name</th>
-                      <th>Date / Time</th>
-                      <th>Group</th>
-                      <th>Attendees</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {teacher.sessions.sort((a,b) => new Date(b.date) - new Date(a.date)).map((session) => (
-                      <tr key={session.session_id}>
-                        <td>
-                          <strong>{session.name}</strong>
-                          <br /><small>ID: {session.session_id.slice(0,8)}...</small>
-                        </td>
-                        <td>
-                          {new Date(session.date).toLocaleDateString()}
-                          <br /><small>{session.time}</small>
-                        </td>
-                        <td>
-                          <span className="tsm-group-chip">{session.courseName}</span>
-                          <div className="tsm-divs">{(session.divisions || []).join(", ")}</div>
-                        </td>
-                        <td className="tsm-center">
-                          <span className="tsm-attendee-count">{session.attendance?.length || 0}</span>
-                        </td>
-                        <td>
-                          <button 
-                            className="tsm-del-btn" 
-                            onClick={() => onDeleteSession(teacher.email, session.session_id)}
-                          >
-                            Delete
-                          </button>
-                        </td>
+            {(() => {
+              const allSessions = [];
+              (teacher.sessions || []).forEach(s => allSessions.push({ ...s, subjectName: "General" }));
+              (teacher.subjects || []).forEach(subj => {
+                (subj.sessions || []).forEach(s => allSessions.push({ ...s, subjectName: subj.name }));
+              });
+
+              if (allSessions.length === 0) {
+                return <p className="tsm-empty">No sessions created yet.</p>;
+              }
+
+              return (
+                <div className="tsm-table-wrapper">
+                  <table className="tsm-table">
+                    <thead>
+                      <tr>
+                        <th>Subject</th>
+                        <th>Session Name</th>
+                        <th>Date / Time</th>
+                        <th>Group</th>
+                        <th>Attendees</th>
+                        <th>Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody>
+                      {allSessions.sort((a,b) => new Date(b.date) - new Date(a.date)).map((session) => (
+                        <tr key={session.session_id}>
+                          <td><span className="tsm-subject-badge">{session.subjectName}</span></td>
+                          <td>
+                            <strong>{session.name}</strong>
+                            <br /><small>ID: {session.session_id.slice(0,8)}...</small>
+                          </td>
+                          <td>
+                            {new Date(session.date).toLocaleDateString()}
+                            <br /><small>{session.time}</small>
+                          </td>
+                          <td>
+                            <span className="tsm-group-chip">{session.courseName}</span>
+                            <div className="tsm-divs">{(session.divisions || []).join(", ")}</div>
+                          </td>
+                          <td className="tsm-center">
+                            <span className="tsm-attendee-count">{session.attendance?.length || 0}</span>
+                          </td>
+                          <td>
+                            <button 
+                              className="tsm-del-btn" 
+                              onClick={() => onDeleteSession(teacher.email, session.session_id)}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>

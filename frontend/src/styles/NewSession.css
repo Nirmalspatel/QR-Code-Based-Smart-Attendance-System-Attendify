@@ -7,6 +7,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  max-height: 95vh;
   animation: slideInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -17,6 +18,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .title-section h2 {
@@ -58,6 +60,7 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+  overflow-y: auto;
 }
 
 .form-group {

@@ -6,7 +6,11 @@ import JWT from "../middleware/JWT.js";
 
 // create session
 router.post("/create", JWT.verifyToken, SessionController.CreateNewSession);
-// get teacher sessions
+// subject management
+router.post("/subjects/create", JWT.verifyToken, SessionController.CreateSubject);
+router.get("/subjects/all", JWT.verifyToken, SessionController.GetSubjects);
+router.post("/subjects/delete", JWT.verifyToken, SessionController.DeleteSubject);
+// get teacher sessions (now includes subjects)
 router.post("/getSessions", JWT.verifyToken, SessionController.GetAllTeacherSessions);
 // get QR
 router.post("/getQR", JWT.verifyToken, SessionController.GetQR);
