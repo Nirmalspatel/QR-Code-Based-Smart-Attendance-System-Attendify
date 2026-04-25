@@ -1,7 +1,7 @@
 import querystring from "querystring";
 import { Teacher } from "../model/Teacher.js";
 import { Student } from "../model/Student.js";
-import uploadImage from "../middleware/Cloudinary.js";
+import uploadImage from "../middleware/cloudinary.js";
 import { AcademicStructure } from "../model/AcademicStructure.js";
 import { getIO } from "../socket.js";
 

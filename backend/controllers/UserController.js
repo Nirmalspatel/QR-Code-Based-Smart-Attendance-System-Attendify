@@ -7,7 +7,7 @@ import { Admin } from "../model/Admin.js";
 import { AcademicStructure } from "../model/AcademicStructure.js";
 import { SystemConfig } from "../model/SystemConfig.js";
 import JWT from "../middleware/JWT.js";
-import uploadImage from "../middleware/Cloudinary.js";
+import uploadImage from "../middleware/cloudinary.js";
 import { getIO } from "../socket.js";
 
 
