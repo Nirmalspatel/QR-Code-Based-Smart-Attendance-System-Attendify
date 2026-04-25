@@ -1,7 +1,7 @@
 import { Router } from "express";
 const router = Router();
 import UserController from "../controllers/UserController.js";
-import upload from "../middleware/Multer.js";
+import upload from "../middleware/multer.js";
 import JWT from "../middleware/JWT.js";
 
 // login & signup
