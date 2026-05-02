@@ -86,6 +86,7 @@ const AdminDashboard = () => {
       const config = {
         headers: {
           Authorization: `Bearer ${token}`,
+          "ngrok-skip-browser-warning": "true"
         },
       };
 
@@ -96,10 +97,10 @@ const AdminDashboard = () => {
         axios.get("/admin/academic-structure", config)
       ]);
 
-      setStudents(studentsRes.data);
-      setTeachers(teachersRes.data);
-      setSessions(sessionsRes.data);
-      setAcademicStructure(academicRes.data);
+      setStudents(Array.isArray(studentsRes.data) ? studentsRes.data : []);
+      setTeachers(Array.isArray(teachersRes.data) ? teachersRes.data : []);
+      setSessions(Array.isArray(sessionsRes.data) ? sessionsRes.data : []);
+      setAcademicStructure(academicRes.data && academicRes.data.streams ? academicRes.data : { streams: [] });
     } catch (error) {
       console.error("Error fetching admin data", error);
       if (error.response && error.response.status === 401) {

@@ -8,6 +8,7 @@ import axios from "axios";
 
 // Configure base URL for production. In development, proxy will be used if this is empty.
 axios.defaults.baseURL = process.env.REACT_APP_API_BASE_URL || "";
+axios.defaults.headers.common["ngrok-skip-browser-warning"] = "true";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(

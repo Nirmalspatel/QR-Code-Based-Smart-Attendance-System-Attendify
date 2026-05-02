@@ -7,11 +7,24 @@
   background-color: var(--white);
   width: 90%;
   max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
   padding: 40px;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
   border: 1px solid rgba(0, 0, 0, 0.05);
   animation: scaleIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.form-popup > button:first-child {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  color: #666;
+  cursor: pointer;
 }
 
 .form-popup-inner {
@@ -81,4 +94,38 @@ button[type="submit"]:hover {
 @keyframes scaleIn {
   from { opacity: 0; transform: translate(-50%, -40%) scale(0.95); }
   to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* Make video and img responsive */
+.form-popup-inner video,
+.form-popup-inner img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+}
+
+/* Mobile Responsive */
+@media (max-width: 480px) {
+  .form-popup {
+    width: 95%;
+    padding: 20px;
+  }
+  
+  .form-popup-inner h2 {
+    font-size: 1.5rem;
+    margin-bottom: 15px;
+  }
+  
+  .cam-btn {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .cam-btn button {
+    width: 100%;
+  }
+
+  button[type="submit"] {
+    width: 100%;
+  }
 }

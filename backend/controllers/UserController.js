@@ -309,6 +309,32 @@ The Smart Attendance System Team`,
   });
 }
 
+// save face descriptors for a student
+async function SaveFaceDescriptors(req, res) {
+  const { email } = req.user;
+  const { descriptors } = req.body; // array of descriptors (each descriptor is an array of 128 numbers)
+
+  if (!descriptors || !Array.isArray(descriptors) || descriptors.length === 0) {
+    return res.status(400).json({ message: "Invalid descriptors provided" });
+  }
+
+  try {
+    const student = await Student.findOneAndUpdate(
+      { email },
+      { faceDescriptors: descriptors },
+      { new: true }
+    );
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    res.status(200).json({ message: "Face descriptors saved successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error saving face descriptors", error: error.message });
+  }
+}
+
 const UserController = {
   Login,
   Signup,
@@ -319,6 +345,7 @@ const UserController = {
   GetPublicAcademicStructure,
   GetPublicAllowedDomains,
   UpdateAcademicGroup,
+  SaveFaceDescriptors,
 };
 
 export default UserController;

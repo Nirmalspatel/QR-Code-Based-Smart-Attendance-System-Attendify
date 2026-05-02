@@ -13,6 +13,8 @@ router.post("/forgotpassword", UserController.ForgotPassword);
 router.post("/sendmail", UserController.SendMail);
 // update profile (name, photo, pno)
 router.post("/updateprofile", JWT.verifyToken, upload.single("profileImage"), UserController.UpdateProfile);
+// save face descriptors
+router.post("/save-face-descriptors", JWT.verifyToken, UserController.SaveFaceDescriptors);
 // public: academic structure for signup dropdowns (no auth required)
 router.get("/academic-structure", UserController.GetPublicAcademicStructure);
 // public: allowed email domains hint for signup page (no auth required)

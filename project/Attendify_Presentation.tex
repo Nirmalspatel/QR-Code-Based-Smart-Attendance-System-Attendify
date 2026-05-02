@@ -1,0 +1,446 @@
+\documentclass[10pt, aspectratio=169]{beamer}
+
+% --- Professional Theme and Styling ---
+\usepackage{beamerthemeshadow}
+\beamersetuncovermixins{\opaqueness<1>{25}}{\opaqueness<2->{15}}
+\mode<presentation>
+{
+  \usecolortheme{rose}
+}
+\usepackage{beamerthemesplit}
+\usefonttheme{professionalfonts}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{hyperref}
+\usepackage{fontawesome5} % For professional icons
+
+% --- Custom Colours for Highlighting ---
+\definecolor{nirmablue}{RGB}{0, 51, 102}   % Deep Navy
+\definecolor{nirmagold}{RGB}{204, 153, 51} % Sophisticated Gold
+\definecolor{techgray}{RGB}{245, 245, 245}
+\definecolor{darkgray}{RGB}{57, 62, 70}    % Mid-tone Gray
+
+% --- Slide Configuration ---
+\setbeamertemplate{navigation symbols}{} % Remove navigation icons
+\setbeamertemplate{itemize items}[circle]
+
+% --- Metadata ---
+\title[Attendify: Smart Attendance]{Attendify: A QR-Code and Geolocation-Based Smart Attendance System}
+\subtitle{Modernizing Institutional Governance through Digital Verification}
+\author[Nirmal Patel]{
+  \textbf{Nirmal Patel} \\ 
+  \footnotesize{Roll No: 22BCE264}
+}
+\institute[Nirma University]{
+  \footnotesize
+  \textbf{Department of Computer Science \& Engineering} \\
+  Nirma University, Ahmedabad \\
+  \textit{Guided by: Dr. Vipul Chudasama}
+}
+\date[2026]{April 30, 2026}
+\logo{\includegraphics[height=0.6cm]{logo.jpg}}
+
+\begin{document}
+
+% --- TITLE SLIDE ---
+{\setbeamertemplate{footline}{} 
+\begin{frame}
+    \titlepage
+\end{frame}
+}
+
+% --- ROADMAP ---
+\section{Roadmap}
+\begin{frame}{Presentation Roadmap}
+    \begin{columns}[c]
+        \column{0.5\textwidth}
+        \begin{itemize}
+            \item \textbf{I. Executive Summary}
+            \begin{itemize}
+                \item Abstract \& Project Vision
+            \end{itemize}
+            \item \textbf{II. Problem Landscape}
+            \begin{itemize}
+                \item Current Crisis \& Gap Analysis
+                \item Problem Statement
+                \item Comparative Analysis
+            \end{itemize}
+            \item \textbf{III. The Attendify Paradigm}
+            \begin{itemize}
+                \item The Tripartite Solution
+            \end{itemize}
+            \item \textbf{IV. System Architecture}
+            \begin{itemize}
+                \item 3-Tier Design \& Tech Stack
+            \end{itemize}
+        \end{itemize}
+        
+        \column{0.5\textwidth}
+        \begin{itemize}
+            \item \textbf{V. Technical Deep-Dive}
+            \begin{itemize}
+                \item Spatial, QR \& Biometric Pillars
+                \item Security Architecture (JWT/Sockets)
+            \end{itemize}
+            \item \textbf{VI. Functional Modules}
+            \begin{itemize}
+                \item Admin, Teacher \& Student Panel
+            \end{itemize}
+            \item \textbf{VII. Data Architecture \& Conclusion}
+            \begin{itemize}
+                \item Schema Design \& Future Path
+            \end{itemize}
+        \end{itemize}
+    \end{columns}
+\end{frame}
+
+% --- ABSTRACT ---
+\section{Abstract}
+\begin{frame}{Abstract}
+    \begin{itemize}
+        \item \textbf{Vision:} Modernizing academic attendance through a location-aware, secure digital infrastructure.
+        \item \textbf{Core Conflict:} Traditional methods (manual call-outs/signature sheets) are time-inefficient and vulnerable to identity fraud.
+        \item \textbf{The Solution:} A full-stack MERN ecosystem implementing a \textbf{Tripartite Verification Model}:
+        \begin{enumerate}
+            \item \textbf{Dynamic QR Tokens} (Temporal Authenticity)
+            \item \textbf{Spatial Auditing} (Haversine-based Geofencing)
+            \item \textbf{Identity Assurance} (Live Biometric Photo Capture)
+        \end{enumerate}
+        \item \textbf{Impact:} Zero-proxy integrity, real-time administrative transparency, and minimal instructional disruption.
+    \end{itemize}
+\end{frame}
+
+% --- PROBLEM LANDSCAPE ---
+\section{Problem}
+\begin{frame}{The Crisis in Traditional Attendance}
+    \begin{columns}
+        \column{0.6\textwidth}
+        \begin{block}{The "Identity Fraud" Problem}
+            Signature sheets and verbal call-outs are vulnerable to \textbf{Proxy Attendance}, leading to inflated records.
+        \end{block}
+        \begin{block}{Instructional Time Loss}
+            Manual attendance consumes $\approx$ \textbf{10-15\%} of a 60-minute lecture in large divisions.
+        \end{block}
+        \begin{itemize}
+            \item \textbf{Data Latency:} Lag between physical marking and digital entry.
+            \item \textbf{No Physical Proof:} Lack of spatial verification of student presence.
+        \end{itemize}
+        \column{0.4\textwidth}
+        \begin{center}
+            \begin{tikzpicture}[scale=0.7, transform shape]
+                \node[circle, draw=red, line width=2pt, minimum size=2.2cm, label=below:{\scriptsize Proxy Attendance}] (A) at (0,0) {\Huge \faUserSecret};
+                \node[circle, draw=red, line width=2pt, minimum size=2.2cm, label=below:{\scriptsize Time Loss}] (B) at (0,-2.5) {\Huge \faHourglassHalf};
+            \end{tikzpicture}
+        \end{center}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Problem Statement}
+    \begin{enumerate}
+        \item \textbf{Lack of Spatial Verification:} No physical proof that the student is actually in the lecture hall.
+        \item \textbf{Identity Fraud:} "Proxy Attendance" by peers.
+        \item \textbf{Data Latency:} Attendance data is often "stale" (entered days after the event).
+        \item \textbf{Operational Inefficiency:} High administrative burden on faculty during lecture hours.
+        \item \textbf{Security Gaps:} Non-dynamic QR codes can be shared via social media to students sitting in hostels.
+    \end{enumerate}
+\end{frame}
+
+% --- COMPARATIVE ANALYSIS ---
+\begin{frame}{Proposed vs. Existing Systems}
+    \begin{table}
+        \centering
+        \small
+        \begin{tabular}{@{}lccc@{}}
+            \toprule
+            \textbf{Feature} & \textbf{Manual Ledger} & \textbf{RFID/Biometric} & \textbf{Attendify} \\ \midrule
+            Cost & Low & Very High & \textbf{Low (BYOD)} \\
+            Anti-Proxy & None & Moderate & \textbf{High (Tripartite)} \\
+            Time Efficiency & Poor & Good & \textbf{Excellent (<30s)} \\
+            Location Awareness & No & Passive & \textbf{Active GPS Gating} \\
+            Scalability & Limited & Hardware Dependent & \textbf{Cloud-Scalable} \\ \bottomrule
+        \end{tabular}
+    \end{table}
+    \vfill
+    \textit{*BYOD: Bring Your Own Device model reduces institutional CAPEX.}
+\end{frame}
+
+% --- SOLUTION ---
+\section{Solution}
+\begin{frame}{The Attendify Paradigm}
+    \textbf{Attendify} is a full-stack MERN ecosystem that transforms attendance from a manual chore into a secure, verified digital handshake.
+    \vspace{0.4cm}
+    \begin{columns}
+        \column{0.33\textwidth}
+        \begin{center}
+            \textcolor{nirmablue}{\Huge \faQrcode} \\
+            \textbf{Dynamic QR} \\
+            \scriptsize Temporal session tokens to prevent sharing.
+        \end{center}
+        \column{0.33\textwidth}
+        \begin{center}
+           \textcolor{nirmablue}{\Huge \faMapMarker}\\
+            \textbf{Geofencing} \\
+            \scriptsize Haversine-based spatial verification.
+        \end{center}
+        \column{0.33\textwidth}
+        \begin{center}
+            \textcolor{nirmablue}{\Huge \faCamera} \\
+            \textbf{Biometric Capture} \\
+            \scriptsize Live photo proof for identity assurance.
+        \end{center}
+    \end{columns}
+    \vfill
+    \begin{center}
+        \textit{\textbf{Goal:} Zero-Proxy integrity with minimal overhead.}
+    \end{center}
+\end{frame}
+
+% --- ARCHITECTURE ---
+\section{Architecture}
+\begin{frame}{3-Tier System Architecture}
+    \begin{columns}
+        \column{0.6\textwidth}
+        \begin{center}
+            \includegraphics[width=0.85\textwidth, height=0.6\textheight, keepaspectratio]{architecture_pro.png}
+        \end{center}
+        \column{0.4\textwidth}
+        \begin{itemize}
+            \item \textbf{Frontend (React):} Cross-platform web app accessing Camera/GPS APIs.
+            \item \textbf{Backend (Node.js):} Haversine calculation engine \& JWT verification.
+            \item \textbf{Data (MongoDB):} Scalable document storage for logs and media (Cloudinary).
+        \end{itemize}
+    \end{columns}
+\end{frame}
+
+% --- TECHNOLOGY STACK ---
+\begin{frame}{Institutional Technology Stack}
+    \small
+    \begin{columns}[t]
+        \column{0.6\textwidth}
+        \textbf{Frontend Architecture}
+        \begin{itemize}
+            \item \textbf{React.js:} Component-based UI for modularity.
+            \item \textbf{Vite:} For optimized production builds.
+            \item \textbf{Tailwind CSS:} Modern, responsive design system.
+        \end{itemize}
+        \vspace{0.1cm}
+        \textbf{Cloud Infrastructure}
+        \begin{itemize}
+            \item \textbf{MongoDB Atlas:} Scalable document-oriented storage.
+            \item \textbf{Cloudinary:} CDN for student biometric assets.
+            \item \textbf{Render:} Deployment orchestration.
+        \end{itemize}
+        \column{0.5\textwidth}
+        \textbf{Backend Logic Layer}
+        \begin{itemize}
+            \item \textbf{Node.js / Express.js:} High-throughput event handling.
+            \item \textbf{Socket.io:} Bidirectional real-time synchronisation.
+            \item \textbf{JWT (jsonwebtoken):} Stateless session management.
+        \end{itemize}
+    \end{columns}
+\end{frame}
+
+% --- TECHNICAL PILLARS ---
+\section{Technical Deep-Dive}
+\begin{frame}{Technical Pillar I: Spatial Auditing}
+    The system calculates the distance between the Teacher ($P_1$) and Student ($P_2$) using the \textbf{Haversine Formula}:
+    \begin{block}{Mathematical Model}
+        \begin{equation*}
+            a = \sin^2\left(\frac{\Delta\phi}{2}\right) + \cos(\phi_1)\cos(\phi_2)\sin^2\left(\frac{\Delta\lambda}{2}\right)
+        \end{equation*}
+        \begin{equation*}
+            d = 2R \cdot \operatorname{atan2}\left(\sqrt{a}, \sqrt{1-a}\right)
+        \end{equation*}
+    \end{block}
+    \begin{itemize}
+        \item \textbf{Radius (R):} 6371 km.
+        \item \textbf{Constraint:} Attendance is only valid if $d \leq 50.0$ meters.
+        \item \textbf{Precision:} Optimized to handle GPS "drift" in dense academic buildings.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Pillar 1: Dynamic QR Synthesis}
+    \begin{columns}
+        \column{0.6\textwidth}
+        \begin{itemize}
+            \item \textbf{Session Entropy:} Every QR is backed by a 128-bit UUID stored in the backend.
+            \item \textbf{Temporal Gating:} Tokens have an expiration lifecycle (Session Duration).
+            \item \textbf{Anti-Sharability:} The QR URL is unique and requires a valid \textbf{Teacher-Student-Session} handshake.
+        \end{itemize}
+        \column{0.4\textwidth}
+        \begin{block}{Logic Workflow}
+            \scriptsize
+            1. Teacher Initials Session \\
+            2. Server generates Unique UUID \\
+            3. Client renders QR with UUID Token \\
+            4. Student scan triggers token validation
+        \end{block}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Pillar 3: Biometric Photo Capture}
+    To prevent a student from scanning multiple phones:
+    \begin{itemize}
+        \item \textbf{Live Event Gating:} System requires a live-captured photo (Canvas API) at the point of submission.
+        \item \textbf{Hardware Integrity:} Accesses the front camera to ensure "selfie" context.
+        \item \textbf{Verification Loop:} Teachers/Admins can audit the captured image on their dashboard against the student's profile.
+        \item \textbf{Secure Storage:} Images are uploaded to Cloudinary with metadata bindings to the specific attendance record.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Technical Pillar II: Security Architecture}
+    \begin{columns}
+        \column{0.5\textwidth}
+        \textbf{Stateless Authentication}
+        \begin{itemize}
+            \item \textbf{JWT (JSON Web Tokens):} Secure, signed payloads for session management.
+            \item \textbf{HttpOnly Cookies:} Mitigating Cross-Site Scripting (XSS) risks.
+        \end{itemize}
+        \column{0.5\textwidth}
+        \textbf{Real-Time Synchronization}
+        \begin{itemize}
+            \item \textbf{Socket.io:} Bidirectional event pushing for live dashboard updates.
+            \item \textbf{Atomic Operations:} MongoDB \texttt{\$push} for race-condition prevention.
+        \end{itemize}
+    \end{columns}
+    \vspace{0.4cm}
+    \begin{center}
+        \scriptsize \texttt{// Backend Logic Snippet: Distance Verification} \\
+        \texttt{if (dist < 0.05) \{ markAttendance(studentId, sessionId); \}}
+    \end{center}
+\end{frame}
+
+% --- FUNCTIONAL MODULES ---
+\section{Modules}
+\begin{frame}{Core Modules: Administrator Dashboard}
+    \begin{columns}
+        \column{0.4\textwidth}
+        \begin{center}
+            \includegraphics[width=1\textwidth, height=0.6\textheight, keepaspectratio]{admin_dashboard.png}
+        \end{center}
+        \column{0.6\textwidth}
+        \textbf{Institutional Governance}
+        \begin{itemize}
+            \item \textbf{Hierarchy Management:} Streams, Courses, and Semesters.
+            \item \textbf{User Provisioning:} Onboarding faculty and bulk-student imports.
+            \item \textbf{Domain Security:} Restricting access to institutional email domains.
+            \item \textbf{System Audits:} Global logs and analytics.
+        \end{itemize}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Core Modules: Teacher Portal}
+    \vspace{-0.5cm}
+    \begin{columns}
+        \column{0.5\textwidth}
+        \textbf{Session Management}
+        \begin{itemize}
+            \item \textbf{Dynamic QR Generation:} Time-bound and session-specific tokens.
+            \item \textbf{Live Roster Monitoring:} Real-time visualization of check-ins.
+            \item \textbf{Manual Overrides:} For hardware failures or special cases.
+            \item \textbf{Data Export:} One-click CSV export for ERP compatibility.
+        \end{itemize}
+        \column{0.5\textwidth}
+        \begin{center}
+            \includegraphics[width=0.75\textwidth, height=0.6\textheight, keepaspectratio]{teacher_session.png}
+        \end{center}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Core Modules: Student Experience}
+    \begin{columns}
+        \column{0.3\textwidth}
+        \begin{center}
+            \includegraphics[width=0.65\textwidth, height=0.6\textheight, keepaspectratio]{student_attendance.jpg}
+        \end{center}
+        \column{0.6\textwidth}
+        \textbf{Student Experience}
+        \begin{itemize}
+            \item \textbf{Instant Scan:} Rapid decoding of session-bound QR tokens.
+            \item \textbf{Spatial Handshake:} Automated background location verification.
+            \item \textbf{Identity Proof:} Live selfie capture integrated with submission.
+            \item \textbf{Personal Analytics:} Real-time attendance percentage tracking.
+        \end{itemize}
+    \end{columns}
+\end{frame}
+
+% --- DATABASE SCHEMA ---
+\section{Database}
+\begin{frame}{Database Schema \& Data Modeling}
+    \begin{center}
+        \textbf{Single Database Instance: MongoDB Atlas}
+    \end{center}
+    \vspace{-0.3cm}
+    \begin{columns}
+        \column{0.48\textwidth}
+        \begin{block}{Collection: Students}
+            \scriptsize
+            \textbf{Fields:} \texttt{name, email, regno, password}
+            \begin{itemize}
+                \item \textbf{Embedded \texttt{sessions}:} \\ \texttt{session\_id, distance, image}
+            \end{itemize}
+        \end{block}
+        
+        \column{0.48\textwidth}
+        \begin{block}{Collection: Teachers}
+            \scriptsize
+            \textbf{Fields:} \texttt{name, email, password, subjects}
+            \begin{itemize}
+                \item \textbf{Embedded \texttt{sessions}:} \\ \texttt{location, radius, attendance[]}
+            \end{itemize}
+        \end{block}
+    \end{columns}
+    
+    \vspace{0.2cm}
+    \begin{block}{Supporting Collections (Unified Ecosystem)}
+        \scriptsize
+        \begin{itemize}
+            \item \textbf{\texttt{Admin}:} System credentials \& administrative access controls.
+            \item \textbf{\texttt{AcademicStructure}:} Mapping of Streams $\rightarrow$ Courses $\rightarrow$ Semesters $\rightarrow$ Divisions.
+            \item \textbf{\texttt{SystemConfig}:} Global environment flags and threshold values.
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+% --- CONCLUSION ---
+\section{Conclusion}
+\begin{frame}{Conclusion and Future Path}
+    \textbf{Project Outcomes:}
+    \begin{itemize}
+        \item Established a scalable, low-cost (BYOD) model for attendance.
+        \item Eliminated "Proxy" entries through tripartite verification.
+        \item Enhanced faculty productivity by automating administrative tasks.
+    \end{itemize}
+    \vspace{0.4cm}
+    \textbf{Phase II Enhancements:}
+    \begin{itemize}
+        \item \textbf{AI Face Recognition:} Automating the verification of captured photos.
+        \item \textbf{PWA (Offline Support):} For campuses with inconsistent Wi-Fi.
+        \item \textbf{ERP Integration:} Direct hooks to university management systems.
+    \end{itemize}
+\end{frame}
+
+% --- THANK YOU ---
+\begin{frame}[plain]
+    \begin{center}
+        \vspace{1cm}
+        \Huge \textcolor{nirmablue}{\faCheckCircle} \\
+        \vspace{0.5cm}
+        {\Huge \textcolor{nirmablue}{\textbf{Thank You}}} \\
+        \vspace{0.3cm}
+        {\Large \textbf{Questions?}} \\
+        \vfill
+        \textcolor{nirmagold}{\rule{0.2\textwidth}{2pt}} \\
+        \vspace{0.3cm}
+        \textbf{Nirmal Patel} \\
+        \vspace{0.1cm}
+        {\scriptsize Department of Computer Science \& Engineering \\ Nirma University, Ahmedabad}
+    \end{center}
+\end{frame}
+
+\end{document}

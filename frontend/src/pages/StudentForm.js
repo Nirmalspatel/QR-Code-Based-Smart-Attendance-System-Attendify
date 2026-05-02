@@ -1,6 +1,7 @@
 //create a new session component
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
+import * as faceapi from "@vladmandic/face-api";
 import "../styles/StudentForm.css";
 
 const StudentForm = ({ togglePopup, onSuccess }) => {
@@ -8,8 +9,27 @@ const StudentForm = ({ togglePopup, onSuccess }) => {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [image, setImage] = useState({ contentType: "", data: "" });
   const [photoData, setPhotoData] = useState(""); // To store the captured photo data
+  const [faceDescriptor, setFaceDescriptor] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isModelLoaded, setIsModelLoaded] = useState(false);
   const videoRef = useRef(null);
+
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        const MODEL_URL = process.env.PUBLIC_URL + "/models";
+        await Promise.all([
+          faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+        ]);
+        setIsModelLoaded(true);
+      } catch (err) {
+        console.error("Error loading models in StudentForm:", err);
+      }
+    };
+    loadModels();
+  }, []);
 
   const constraints = {
     video: true,
@@ -54,14 +74,32 @@ const StudentForm = ({ togglePopup, onSuccess }) => {
       .drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
 
     const photoDataUrl = canvas.toDataURL("image/png");
-
     setImage(await fetch(photoDataUrl).then((res) => res.blob()));
-
     setPhotoData(photoDataUrl);
+
+    if (isModelLoaded) {
+      try {
+        const detection = await faceapi.detectSingleFace(canvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.6 }))
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+        
+        if (detection) {
+          setFaceDescriptor(Array.from(detection.descriptor));
+        } else {
+          alert("No face detected! Please ensure your face is clearly visible.");
+          setPhotoData(""); // Reset photo if no face
+          return;
+        }
+      } catch (err) {
+        console.error("Face detection error:", err);
+      }
+    }
+
     stopCamera();
   };
   const ResetCamera = () => {
     setPhotoData("");
+    setFaceDescriptor(null);
     startCamera();
   };
 
@@ -105,6 +143,10 @@ const StudentForm = ({ togglePopup, onSuccess }) => {
           data.append("Location", locationString);
           data.append("student_email", localStorage.getItem("email"));
           data.append("image", image, "attendance.png"); // image is a Blob
+          
+          if (faceDescriptor) {
+            data.append("faceDescriptor", JSON.stringify(faceDescriptor));
+          }
 
           try {
             console.log("Submitting attendance...");
@@ -154,12 +196,14 @@ const StudentForm = ({ togglePopup, onSuccess }) => {
         {photoData && <img src={photoData} width={300} alt="Captured" />}
         <div className="cam-btn">
           <button onClick={startCamera}>Start Camera</button>
-          <button onClick={capturePhoto}>Capture</button>
+          <button onClick={capturePhoto} disabled={!isModelLoaded}>
+            {!isModelLoaded ? "Loading AI..." : "Capture"}
+          </button>
           <button onClick={ResetCamera}>Reset</button>
         </div>
 
         <form onSubmit={AttendSession}>
-          <button type="submit" disabled={isLoading}>
+          <button type="submit" disabled={isLoading || !photoData}>
             {isLoading ? "Processing..." : "Done"}
           </button>
         </form>

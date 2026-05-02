@@ -50,6 +50,15 @@ function checkStudentDistance(Location1, Location2) {
   return distance.toFixed(2);
 }
 
+function calculateEuclideanDistance(desc1, desc2) {
+  if (!desc1 || !desc2 || desc1.length !== desc2.length) return 1.0;
+  let sum = 0;
+  for (let i = 0; i < desc1.length; i++) {
+    sum += Math.pow(desc1[i] - desc2[i], 2);
+  }
+  return Math.sqrt(sum);
+}
+
 //make controller functions
 
 async function CreateSubject(req, res) {
@@ -269,7 +278,7 @@ async function GetQR(req, res) {
 //attend session
 async function AttendSession(req, res) {
   const tokenData = req.user;
-  const { session_id, teacher_email, IP, student_email, Location, date } = req.body;
+  const { session_id, teacher_email, IP, student_email, Location, date, faceDescriptor } = req.body;
 
   if (!req.file) {
     return res.status(400).json({ message: "Photo is required for attendance" });
@@ -337,6 +346,36 @@ async function AttendSession(req, res) {
     if (alreadyMarked) {
       return res.status(200).json({ message: "Attendance already marked" });
     }
+
+    // --- Face Recognition Verification ---
+    if (studentInfo.faceDescriptors && studentInfo.faceDescriptors.length > 0) {
+      if (!faceDescriptor) {
+        return res.status(400).json({ message: "Face descriptor missing. Please capture a clear photo." });
+      }
+      
+      let incomingDescriptor;
+      try {
+        incomingDescriptor = JSON.parse(faceDescriptor);
+      } catch (e) {
+        return res.status(400).json({ message: "Invalid face descriptor format." });
+      }
+
+      let minDistance = 1.0;
+      for (const storedDesc of studentInfo.faceDescriptors) {
+        const dist = calculateEuclideanDistance(incomingDescriptor, storedDesc);
+        if (dist < minDistance) minDistance = dist;
+      }
+
+      console.log(`[FACE MATCH] Student: ${student_email}, Min Distance: ${minDistance}`);
+      
+      // Threshold for matching (Very Accurate). Lower is stricter. 0.45 is highly accurate for 1:1 verification.
+      if (minDistance > 0.45) {
+        return res.status(403).json({ message: "Face verification failed. Please ensure your face is clearly visible and matches your registered profile." });
+      }
+    } else {
+      console.log(`[FACE MATCH] Student: ${student_email} has no registered face descriptors. Bypassing verification.`);
+    }
+    // -------------------------------------
 
     const distance = checkStudentDistance(Location, session.location);
     console.log(`[GEO DEBUG] Session: ${session.name}`);
@@ -433,7 +472,8 @@ async function GetStudentSessions(req, res) {
     const student = await Student.findOne({
       email: tokenData.email,
     });
-    res.status(200).json({ sessions: student.sessions });
+    const hasFaceRegistered = student.faceDescriptors && student.faceDescriptors.length > 0;
+    res.status(200).json({ sessions: student.sessions, hasFaceRegistered });
   } catch (err) {
     res.status(400).json({ message: err.message });
   }

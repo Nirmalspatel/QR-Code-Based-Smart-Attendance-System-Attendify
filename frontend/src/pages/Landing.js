@@ -2,7 +2,7 @@ import React from "react";
 import { useEffect } from "react";
 import "../styles/Landing.css";
 import { Link } from "react-router-dom";
-import heroImage from "../assets/atendo-hero.png";
+import heroImage from "../assets/modern_attendance_hero.png";
 
 const Landing = () => {
   useEffect(() => {
@@ -42,23 +42,41 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* <section className="features-grid">
-        <div className="feature-card">
-          <div className="feature-icon">🔍</div>
-          <h3>QR Attendance</h3>
-          <p>Scan unique QR codes to mark attendance instantly and securely. Our geofencing ensures students are actually in the classroom.</p>
+      <section className="features-grid-premium">
+        <div className="feature-card-premium">
+          <div className="feature-icon-wrapper">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><rect x="8" y="8" width="8" height="8" rx="2" ry="2"></rect></svg>
+          </div>
+          <h3>Lightning Fast QR</h3>
+          <p>Scan unique cryptographic QR codes to mark your presence instantly. No more roll calls or manual registers.</p>
         </div>
-        <div className="feature-card">
-          <div className="feature-icon">📈</div>
-          <h3>Real-time Stats</h3>
-          <p>Monitor attendance trends and participation with dynamic, colorful dashboards for students, teachers, and admins.</p>
+        <div className="feature-card-premium">
+          <div className="feature-icon-wrapper">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+          </div>
+          <h3>AI Face Verification</h3>
+          <p>Eliminate proxy attendance completely with our advanced client-side facial recognition and strict Euclidean distance verification.</p>
         </div>
-        <div className="feature-card">
-          <div className="feature-icon">⚡</div>
-          <h3>Easy Management</h3>
-          <p>Manage multiple sessions, student records, and teacher account approvals with just a few clicks from a central hub.</p>
+        <div className="feature-card-premium">
+          <div className="feature-icon-wrapper">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          </div>
+          <h3>Real-time Analytics</h3>
+          <p>Beautiful, intuitive dashboards that provide instant insights into student participation and academic trends.</p>
         </div>
-      </section> */}
+      </section>
+
+      <footer className="landing-footer">
+        <div className="footer-content">
+          <div className="footer-logo">
+            <h2>Attendify</h2>
+            <p>Smart Campus Management</p>
+          </div>
+          <div className="footer-links">
+            <p>&copy; {new Date().getFullYear()} Nirma University. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

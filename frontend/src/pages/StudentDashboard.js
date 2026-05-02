@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import "../styles/StudentDashboard.css";
 import { useNavigate } from "react-router-dom";
+import "../styles/StudentDashboard.css";
 import StudentForm from "./StudentForm";
 import QRScannerModal from "./QRScannerModal";
+import FaceRegistrationModal from "./FaceRegistrationModal";
 const queryParameters = new URLSearchParams(window.location.search);
 
 const Dashboard = () => {
@@ -14,6 +15,8 @@ const Dashboard = () => {
   const [isSessionDisplay, setSessionDisplay] = useState(false);
   const [isScannerOpen, setScannerOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [hasFaceRegistered, setHasFaceRegistered] = useState(true);
+  const [isFaceRegistrationOpen, setIsFaceRegistrationOpen] = useState(false);
   const navigate = useNavigate();
 
   function getStudentSessions() {
@@ -23,6 +26,9 @@ const Dashboard = () => {
       })
       .then((response) => {
         setSessionList(response.data.sessions);
+        if (response.data.hasFaceRegistered !== undefined) {
+          setHasFaceRegistered(response.data.hasFaceRegistered);
+        }
       })
       .catch((error) => {
         console.log(error);
@@ -147,7 +153,11 @@ const Dashboard = () => {
               </div>
               <button 
                 className="btn-pulse-scan"
-                onClick={() => setScannerOpen(true)}
+                onClick={() => {
+                  setIsFaceRegistrationOpen(false);
+                  setSessionDisplay(false);
+                  setScannerOpen(true);
+                }}
               >
                 <div className="btn-icon-wrapper">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -162,6 +172,35 @@ const Dashboard = () => {
             <div className="hero-glow-1"></div>
             <div className="hero-glow-2"></div>
           </div>
+
+          {!hasFaceRegistered && (
+            <div className="face-id-banner">
+              <div className="banner-content">
+                <div className="banner-icon-wrapper">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+                    <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+                    <rect x="8" y="8" width="8" height="8" rx="2" ry="2"></rect>
+                  </svg>
+                </div>
+                <div className="banner-text">
+                  <h4>Secure Your Attendance</h4>
+                  <p>Set up Face ID once to seamlessly verify your identity in all future classes.</p>
+                </div>
+              </div>
+              <button 
+                className="btn-setup-face"
+                onClick={() => {
+                  setScannerOpen(false);
+                  setSessionDisplay(false);
+                  setIsFaceRegistrationOpen(true);
+                }}
+              >
+                <span>Set Up Face ID</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </button>
+            </div>
+          )}
 
           <div className="session-dashboard-container">
             <div className="student-grouped-list-premium">
@@ -243,6 +282,17 @@ const Dashboard = () => {
         <QRScannerModal 
           onClose={() => setScannerOpen(false)} 
           onScanSuccess={handleQRScanSuccess} 
+        />
+      )}
+
+      {isFaceRegistrationOpen && (
+        <FaceRegistrationModal
+          onClose={() => setIsFaceRegistrationOpen(false)}
+          onSuccess={() => {
+            setHasFaceRegistered(true);
+            setSuccessMessage("Face ID Registered Successfully!");
+            setTimeout(() => setSuccessMessage(""), 4000);
+          }}
         />
       )}
     </div>

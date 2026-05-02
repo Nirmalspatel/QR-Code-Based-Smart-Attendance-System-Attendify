@@ -9,6 +9,7 @@ const userSchema = new schema(
     regno: { type: String, required: true },
     password: { type: String, required: true },
     profileImage: { type: String, default: "" },
+    faceDescriptors: { type: [[Number]], default: [] },
     // Academic grouping (set at signup, updatable from Profile)
     streamId: { type: schema.Types.ObjectId, default: null },
     streamName: { type: String, default: "" },
