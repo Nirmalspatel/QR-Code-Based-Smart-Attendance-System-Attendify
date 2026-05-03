@@ -153,7 +153,7 @@ const TeacherDashboard = () => {
               <h2>{selectedSubject.name}</h2>
             </div>
           ) : (
-            <h2>Your Subjects</h2>
+            <h2>{localStorage.getItem("name") ? `${localStorage.getItem("name")}'s Subjects` : "Your Subjects"}</h2>
           )}
         </div>
         <div className="createbtncol">

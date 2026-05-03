@@ -51,12 +51,12 @@ const Dashboard = () => {
     localStorage.removeItem("teacher_email");
     setSessionDisplay(false);
     setSuccessMessage(msg || "Attendance Marked Successfully!");
-    
+
     // Auto-hide the toast after 4 seconds
     setTimeout(() => {
       setSuccessMessage("");
     }, 4000);
-    
+
     // Refresh sessions to show the newly marked attendance
     getStudentSessions();
     navigate("/student-dashboard");
@@ -129,7 +129,7 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard-main-premium">
-      
+
       {/* Toast Notification for Success */}
       {successMessage && (
         <div className="success-toast-premium">
@@ -148,10 +148,10 @@ const Dashboard = () => {
             <div className="dashboard-hero-content">
               <div className="hero-text-block">
                 <span className="hero-badge">Welcome back</span>
-                <h1>Student Portal</h1>
+                <h1>{localStorage.getItem("name") ? `${localStorage.getItem("name")}` : "Student Portal"}</h1>
                 <p>Track your academic presence and scan QR codes instantly.</p>
               </div>
-              <button 
+              <button
                 className="btn-pulse-scan"
                 onClick={() => {
                   setIsFaceRegistrationOpen(false);
@@ -188,7 +188,7 @@ const Dashboard = () => {
                   <p>Set up Face ID once to seamlessly verify your identity in all future classes.</p>
                 </div>
               </div>
-              <button 
+              <button
                 className="btn-setup-face"
                 onClick={() => {
                   setScannerOpen(false);
@@ -210,13 +210,13 @@ const Dashboard = () => {
                     <div className="subject-group-header-glass">
                       <div className="subject-title-wrapper">
                         <div className="subject-icon">
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>
                         </div>
                         <h3>{subject}</h3>
                       </div>
                       <span className="count-badge-premium">{groupedSessions[subject].length} Sessions</span>
                     </div>
-                    
+
                     <div className="student-session-grid-premium">
                       {groupedSessions[subject].map((session, index) => {
                         const distanceData = getDistance(session.distance, session.radius);
@@ -235,20 +235,20 @@ const Dashboard = () => {
                                 {distanceData.distance}m
                               </div>
                             </div>
-                            
+
                             <div className="card-info-premium">
                               <div className="session-info-top">
                                 <h4>{session.name}</h4>
                                 <div className="date-chip">{formattedDate}</div>
                               </div>
-                              
+
                               <div className="session-stats-grid">
                                 <div className="stat-block">
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
                                   <span>{session.time}</span>
                                 </div>
                                 <div className="stat-block">
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
                                   <span>{session.duration}m</span>
                                 </div>
                               </div>
@@ -262,7 +262,7 @@ const Dashboard = () => {
               ) : (
                 <div className="empty-state-premium">
                   <div className="empty-icon-wrap">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="9" y1="3" x2="9" y2="21" /></svg>
                   </div>
                   <h3>Ready for Class!</h3>
                   <p>Your attendance records will magically appear here once you scan into your first session.</p>
@@ -277,11 +277,11 @@ const Dashboard = () => {
           <StudentForm togglePopup={toggleStudentForm} onSuccess={handleAttendanceSuccess} />
         </div>
       )}
-      
+
       {isScannerOpen && (
-        <QRScannerModal 
-          onClose={() => setScannerOpen(false)} 
-          onScanSuccess={handleQRScanSuccess} 
+        <QRScannerModal
+          onClose={() => setScannerOpen(false)}
+          onScanSuccess={handleQRScanSuccess}
         />
       )}
 

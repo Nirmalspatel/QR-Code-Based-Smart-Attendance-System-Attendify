@@ -12,6 +12,7 @@ import {
   AdminDashboard,
   Profile,
   AdminLogin,
+  AboutUs,
 } from "./pages/Index";
 
 const router = createBrowserRouter([
@@ -62,6 +63,10 @@ const router = createBrowserRouter([
       {
         path: "admin-login",
         element: <AdminLogin />,
+      },
+      {
+        path: "about",
+        element: <AboutUs />,
       },
       {
         path: "*",

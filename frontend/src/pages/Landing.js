@@ -74,6 +74,7 @@ const Landing = () => {
           </div>
           <div className="footer-links">
             <p>&copy; {new Date().getFullYear()} Nirma University. All rights reserved.</p>
+            <Link to="/about" style={{ color: "var(--landing-primary)", marginTop: "10px", display: "inline-block", fontWeight: "600", textDecoration: "none" }}>Learn More About Us &rarr;</Link>
           </div>
         </div>
       </footer>
